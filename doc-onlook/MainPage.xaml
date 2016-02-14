@@ -13,24 +13,36 @@
             <ColumnDefinition Width="7*"></ColumnDefinition>
         </Grid.ColumnDefinitions>
         <Grid Name="FileList" Grid.Row="0" Grid.Column="0" Background="Aqua">
-            
+            <ListView Name="LocalListView" Margin="20">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Name="FileListItem" Tapped="FileListItem_Tapped">
+                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
+                            <TextBlock Text="{Binding FileType}" FontWeight="Normal" />
+                            <TextBlock Text="{Binding DateCreated}" FontWeight="Normal" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
         </Grid>
         <Grid Grid.Row="0" Grid.Column="1" Background="#FFFFBAC6">
             <Pivot>
                 <Pivot.Items>
-                    <PivotItem Header="File 1">
+                    <PivotItem Header="Current">
                         <Grid>
                             <WebView Name="testview_1"></WebView>
                         </Grid>
                     </PivotItem>
-                    <PivotItem Name="FilePivot_2" Header="File 2">
+                    <PivotItem Header="Alt">
                         <Grid>
                             <ScrollViewer></ScrollViewer>
                         </Grid>
                     </PivotItem>
                 </Pivot.Items>
             </Pivot>
-            <CommandBar VerticalAlignment="Bottom"></CommandBar>
+            <CommandBar VerticalAlignment="Bottom">
+                <AppBarButton x:Name="SaveToDeviceBtn" Label="Save to Device" VerticalAlignment="Top" Icon="SaveLocal" Click="SaveToDeviceBtn_Click"/>
+            </CommandBar>
         </Grid>
     </Grid>
 </Page>
