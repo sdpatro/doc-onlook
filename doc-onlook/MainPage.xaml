@@ -7,7 +7,30 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" RequestedTheme="Light">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="3*"></ColumnDefinition>
+            <ColumnDefinition Width="7*"></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        <Grid Name="FileList" Grid.Row="0" Grid.Column="0" Background="Aqua">
+            
+        </Grid>
+        <Grid Grid.Row="0" Grid.Column="1" Background="#FFFFBAC6">
+            <Pivot>
+                <Pivot.Items>
+                    <PivotItem Header="File 1">
+                        <Grid>
+                            <WebView Name="testview_1"></WebView>
+                        </Grid>
+                    </PivotItem>
+                    <PivotItem Name="FilePivot_2" Header="File 2">
+                        <Grid>
+                            <ScrollViewer></ScrollViewer>
+                        </Grid>
+                    </PivotItem>
+                </Pivot.Items>
+            </Pivot>
+            <CommandBar VerticalAlignment="Bottom"></CommandBar>
+        </Grid>
     </Grid>
 </Page>

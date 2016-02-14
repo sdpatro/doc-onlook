@@ -12,6 +12,7 @@ using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
+using System.Diagnostics;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -25,6 +26,15 @@ namespace doc_onlook
         public MainPage()
         {
             this.InitializeComponent();
+            FillCarousel();
+        }
+
+        public void FillCarousel()
+        {
+            string HTMLstring = "<html><body>Hola HTML in XAML!</body></html>";
+            WebView TestView = (WebView)this.FindName("testview_1");
+            TestView.Navigate(new Uri("ms-appx-web:///assets/TestPage.html"));
+
         }
     }
 }
