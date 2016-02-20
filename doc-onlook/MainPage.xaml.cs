@@ -1,17 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Controls.Primitives;
-using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Input;
-using Windows.UI.Xaml.Media;
-using Windows.UI.Xaml.Navigation;
 using System.Diagnostics;
 using Windows.Storage;
 using Windows.UI.Popups;
@@ -19,6 +11,12 @@ using Windows.Storage.Pickers;
 using Windows.Storage.Provider;
 using Windows.Storage.Search;
 using System.Threading.Tasks;
+using Windows.Networking.Sockets;
+using Windows.Storage.Streams;
+using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text;
+using System.Text.RegularExpressions;
+
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -29,18 +27,15 @@ namespace doc_onlook
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        public class OnlookFile
-        {
-            string Data { get; set; }
-            string Type { get; set; }
-        }
+        bool isReceivingFile = false;
+        int fileReceptionProgress = 0;
 
-        
         public MainPage()
         {
             this.InitializeComponent();
             FillSampleFiles();
             FillCarousel();
+            RunTCPListener();
         }
 
         // Fill the local files list:
@@ -169,6 +164,83 @@ namespace doc_onlook
                 return null;
             }
             
+        }
+
+        public async void RunTCPListener()
+        {
+            StreamSocketListener listener = new StreamSocketListener();
+            await listener.BindServiceNameAsync("2112");
+            listener.ConnectionReceived += OnConnection;
+        }
+
+        public async void NotifyUser(string Message)
+        {
+            MessageDialog dialog = new MessageDialog(Message);
+            await dialog.ShowAsync();
+        }
+
+        public int getContentLength(string content)
+        {
+            Regex regex = new Regex("Content-Length: ([0-9]*)");
+            Match match = regex.Match(content);
+            if (match.Success)
+            {
+                return int.Parse(match.Groups[1].Value);
+            }
+            return 0;
+        }
+        
+        private async void OnConnection( StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
+        {
+            using (IInputStream inStream = args.Socket.InputStream)
+            {
+                DataReader reader = new DataReader(inStream);
+                reader.InputStreamOptions = InputStreamOptions.Partial;
+                int contentLength = 0;
+                uint numReadBytes;
+                string totalContent = "";
+
+                IOutputStream outStream = args.Socket.OutputStream;
+
+                do
+                {
+                    numReadBytes = await reader.LoadAsync(1 << 20);  // "Hangs" when all data is read until the client cancels the connection, e.g. numReadBytes == 0
+
+                    if (numReadBytes > 0)
+                    {
+                        byte[] tmpBuf = new byte[numReadBytes];
+                        reader.ReadBytes(tmpBuf);
+                        string result = Encoding.UTF8.GetString(tmpBuf).TrimEnd('\0');
+                        Debug.WriteLine(result);
+                        string[] contents = Regex.Split(result,"\r\n\r\n");
+                        if (getContentLength(result)!= 0)
+                        {
+                            contentLength = getContentLength(result);
+                            Debug.WriteLine("Total content length: " + contentLength);
+                        }
+                        string content;
+                        if (contents.Length > 1)
+                        {
+                            content = contents[1];
+                        }
+                        else
+                        {
+                            content = contents[0];
+                        }
+                        totalContent += content;
+                        if (totalContent.Length == contentLength)
+                        {
+                            Debug.WriteLine("Read all data.");
+                            IBuffer replyBuff = tmpBuf.AsBuffer();
+                            await outStream.WriteAsync(replyBuff);
+                            NotifyUser("Recieved new data");
+                            break;
+                        }
+                        
+                    }
+                } while (numReadBytes > 0);
+            }
+            Debug.WriteLine("Finished reading");
         }
 
     }
