@@ -16,7 +16,9 @@ using Windows.Storage.Streams;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Text.RegularExpressions;
-
+using Windows.ApplicationModel.Core;
+using Windows.UI.Core;
+using System.Collections;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -30,12 +32,45 @@ namespace doc_onlook
         bool isReceivingFile = false;
         int fileReceptionProgress = 0;
 
+        class Test
+        {
+            public event EventHandler MyEvent
+            {
+                add
+                {
+                    Debug.WriteLine("add operation");
+                }
+                remove
+                {
+                    Debug.WriteLine("remove operation");
+                }
+            }
+
+            public void DoNothing (object sender, EventArgs e)
+            {
+
+            }
+        }
+
         public MainPage()
         {
             this.InitializeComponent();
             FillSampleFiles();
             FillCarousel();
             RunTCPListener();
+            //RunFileReceptionListener();
+        }
+
+        public void RunFileReceptionListener()
+        {
+            Test t = new Test();
+            t.MyEvent += new EventHandler(t.DoNothing);
+            t.MyEvent -= null;
+        }
+
+        public string delFunction(int x)
+        {
+            return "delFunction: " + x.ToString();
         }
 
         // Fill the local files list:
@@ -179,7 +214,44 @@ namespace doc_onlook
             await dialog.ShowAsync();
         }
 
-        public int getContentLength(string content)
+        public async void NotifyUserForeign(string Message)
+        {
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+            () =>
+            {
+                MessageDialog dialog = new MessageDialog(Message);
+                dialog.ShowAsync();
+            });
+        }
+
+        public async void StartProgress()
+        {
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+            () =>
+            {
+                FileReceptionIndicator.Text = "Receiving new file...";
+            });
+        }
+
+        public async void UpdateProgress(int progress)
+        {
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+            () =>
+            {
+                FileReceptionIndicator.Text = "Receiving new file... "+progress+" %";
+            });
+        }
+
+        public async void FinishProgress()
+        {
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+            () =>
+            {
+                FileReceptionIndicator.Text = "File received.";
+            });
+        }
+
+        public int GetContentLength(string content)
         {
             Regex regex = new Regex("Content-Length: ([0-9]*)");
             Match match = regex.Match(content);
@@ -189,11 +261,29 @@ namespace doc_onlook
             }
             return 0;
         }
-        
+
+        public IDictionary<string,string> ParseContent(string content)
+        {
+            Regex r = new Regex("([A-Za-z]*)=([^&]*)");
+            IDictionary<string, string> contentDict = new Dictionary<string,string>();
+            
+            Match m = r.Match(content);
+            while (m.Success)
+            {
+                Debug.WriteLine("Match "+m.Groups[1].Value+" "+m.Groups[2].Value);
+                contentDict.Add(new KeyValuePair<string, string>(m.Groups[1].Value, m.Groups[2].Value));
+                m = m.NextMatch();
+            }
+
+            return contentDict;
+
+        }
+
         private async void OnConnection( StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
         {
             using (IInputStream inStream = args.Socket.InputStream)
             {
+                StartProgress();
                 DataReader reader = new DataReader(inStream);
                 reader.InputStreamOptions = InputStreamOptions.Partial;
                 int contentLength = 0;
@@ -204,18 +294,18 @@ namespace doc_onlook
 
                 do
                 {
-                    numReadBytes = await reader.LoadAsync(1 << 20);  // "Hangs" when all data is read until the client cancels the connection, e.g. numReadBytes == 0
+                    numReadBytes = await reader.LoadAsync(1 << 20);  
 
                     if (numReadBytes > 0)
                     {
                         byte[] tmpBuf = new byte[numReadBytes];
                         reader.ReadBytes(tmpBuf);
                         string result = Encoding.UTF8.GetString(tmpBuf).TrimEnd('\0');
-                        Debug.WriteLine(result);
+                        Debug.WriteLine("Result: " + result);
                         string[] contents = Regex.Split(result,"\r\n\r\n");
-                        if (getContentLength(result)!= 0)
+                        if (GetContentLength(result)!= 0)
                         {
-                            contentLength = getContentLength(result);
+                            contentLength = GetContentLength(result);
                             Debug.WriteLine("Total content length: " + contentLength);
                         }
                         string content;
@@ -228,12 +318,15 @@ namespace doc_onlook
                             content = contents[0];
                         }
                         totalContent += content;
+                        UpdateProgress((totalContent.Length*100 / contentLength));
                         if (totalContent.Length == contentLength)
                         {
-                            Debug.WriteLine("Read all data.");
+                            FinishProgress();
+                            Debug.WriteLine("Read all data: "+totalContent);
+                            ParseContent(totalContent);
                             IBuffer replyBuff = tmpBuf.AsBuffer();
                             await outStream.WriteAsync(replyBuff);
-                            NotifyUser("Recieved new data");
+                            NotifyUserForeign("Hola");
                             break;
                         }
                         

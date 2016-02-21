@@ -13,6 +13,10 @@
             <ColumnDefinition Width="7*"></ColumnDefinition>
         </Grid.ColumnDefinitions>
         <Grid Name="FileList" Grid.Row="0" Grid.Column="0" Background="Aqua">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="9*"></RowDefinition>
+                <RowDefinition Height="*"></RowDefinition>
+            </Grid.RowDefinitions>
             <ListView Name="LocalListView" Margin="20">
                 <ListView.ItemTemplate>
                     <DataTemplate>
@@ -24,6 +28,9 @@
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
+            <Grid Name="FileReception" Background="Azure" Grid.Row="1">
+                <TextBlock Name="FileReceptionIndicator" HorizontalAlignment="Center" VerticalAlignment="Center">doc onlook</TextBlock>
+            </Grid>
         </Grid>
         <Grid Grid.Row="0" Grid.Column="1" Background="#FFFFBAC6">
             <Pivot>
