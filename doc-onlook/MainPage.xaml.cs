@@ -29,17 +29,42 @@ namespace doc_onlook
     {
 
         Workspace workspace;
+        List<StorageFile> localFilesList;
+        List<StorageFile> localFilesList_queried;
+        List<string> fileNameList;
+        List<string> indexedWords;
+        string _type;
+
         public MainPage()
         {
+            
+            InitializeData();
             InitializeComponent();
             FillWorkspace();
             RunTCPListener();
         }
 
-        public async void FillWorkspace()
+        public void FillWorkspace()
         {
             UpdateLocalList();
             workspace = new Workspace(WorkspacePivot);
+            workspace.AddToList("hello.html");
+
+            WorkspacePivot.Focus(FocusState.Pointer);
+        }
+
+        private void InitializeData()
+        {
+            localFilesList = new List<StorageFile>();
+            localFilesList_queried = new List<StorageFile>();
+
+            IDictionary<string, string> dict = new Dictionary<string, string>();
+            dict.Add("name", "hello");
+            dict.Add("type", ".html");
+            dict.Add("data", "<html><body>Hello doc-onlook</body></html>");
+            WriteUniqueFileToLocal(dict);
+
+            fileNameList = new List<string>();
         }
 
         class Workspace
@@ -114,7 +139,6 @@ namespace doc_onlook
             {
                 this.workspacePivot = workspacePivot;
                 workspaceList = new List<string>();
-                AddToList("hello.html");
             }
         };
 
@@ -123,8 +147,15 @@ namespace doc_onlook
         // Fill the local files list:
         public async void UpdateLocalList()
         {
-            List<StorageFile> items = await GetLocalFiles();
-            LocalListView.ItemsSource = items;
+            localFilesList = await GetLocalFiles();
+            foreach (StorageFile file in localFilesList)
+            {
+                if(fileNameList.IndexOf(file.DisplayName) == -1)
+                {
+                    fileNameList.Add(file.DisplayName);
+                }
+            }
+            LocalListView.ItemsSource = localFilesList;
         }
 
         public async void UpdateLocalList_Thread()
@@ -292,6 +323,24 @@ namespace doc_onlook
             
         }
 
+        public async void WriteUniqueFileToLocal(IDictionary<string, string> ContentData)
+        {
+            StorageFolder localFolder = ApplicationData.Current.LocalFolder;
+
+            StorageFile newFile = await localFolder.CreateFileAsync(ContentData["name"] + ContentData["type"], CreationCollisionOption.ReplaceExisting);
+
+            using (IRandomAccessStream textStream = await newFile.OpenAsync(FileAccessMode.ReadWrite))
+            {
+                using (DataWriter textWriter = new DataWriter(textStream))
+                {
+                    textWriter.WriteString(ContentData["data"]);
+                    await textWriter.StoreAsync();
+                }
+            }
+
+        }
+
+
         private async void OnConnection( StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
         {
             using (IInputStream inStream = args.Socket.InputStream)
@@ -352,13 +401,14 @@ namespace doc_onlook
             Debug.WriteLine("Finished reading");
         }
 
-        private async void DeleteLocalFile(string name)
+        private async void DeleteLocalFile(string name, string type)
         {
             try
             {
                 StorageFolder localFolder = ApplicationData.Current.LocalFolder;
-                StorageFile file = await localFolder.GetFileAsync(name+".html");
+                StorageFile file = await localFolder.GetFileAsync(name+type);
                 await file.DeleteAsync();
+                fileNameList.Remove(name + type);
                 NotifyUser("File deleted.");
                 
                 UpdateLocalList();
@@ -373,7 +423,8 @@ namespace doc_onlook
         {
             StackPanel stackElement = (StackPanel)sender;
             TextBlock name = (TextBlock)stackElement.Children[0];
-            DeleteLocalFile(name.Text);
+            TextBlock type = (TextBlock)stackElement.Children[1];
+            DeleteLocalFile(name.Text,type.Text);
         }
 
         private void NewTabBtn_Tapped_1(object sender, TappedRoutedEventArgs e)
@@ -408,7 +459,6 @@ namespace doc_onlook
         private async void WorkspacePivot_Drop(object sender, DragEventArgs e)
         {
             var fileName = await e.DataView.GetTextAsync();
-            TestOutput.Text = fileName;
             workspace.AddToList(fileName);
             DragPanelStatus(false);
         }
@@ -424,5 +474,47 @@ namespace doc_onlook
             DragPanelStatus(true);
         }
 
+        private void AutoSuggestBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        {
+            if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+            {
+                sender.ItemsSource = fileNameList;
+            }
+        }
+
+        private void AutoSuggestBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+        {
+            var submittedName = args.QueryText;
+            localFilesList_queried.Clear();
+            foreach(StorageFile file in localFilesList)
+            {
+                if (file.DisplayName.Contains(submittedName))
+                    localFilesList_queried.Add(file);
+            }
+            LocalListView.ItemsSource = null;
+            LocalListView.ItemsSource = localFilesList_queried;
+            ((SymbolIcon)LoadAll.Content).Symbol = Symbol.Back;
+        }
+
+        private async void AutoSuggestBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
+        {
+            var selectedName = args.SelectedItem.ToString();
+            foreach (StorageFile storageFileItem in localFilesList)
+            {
+                if (storageFileItem.DisplayName == selectedName)
+                {
+                    WorkspacePivot.Focus(FocusState.Pointer);
+                    StorageFile file = await GetLocalFile(selectedName,storageFileItem.FileType);
+                    workspace.ShowDoc(file);
+                    break;
+                }
+            }
+        }
+
+        private void LoadAll_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            UpdateLocalList();
+            ((SymbolIcon)LoadAll.Content).Symbol = Symbol.Refresh;
+        }
     }
 }

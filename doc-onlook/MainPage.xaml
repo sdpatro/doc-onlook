@@ -15,30 +15,33 @@
         <Grid Name="FileList" Grid.Row="0" Grid.Column="0" Background="Aqua">
             <Grid.RowDefinitions>
                 <RowDefinition Height="9*"></RowDefinition>
-                <RowDefinition Height="*"></RowDefinition>
+                <RowDefinition Height="1*"></RowDefinition>
+                <RowDefinition Height="1.2*"></RowDefinition>
             </Grid.RowDefinitions>
             <ListView Name="LocalListView" Margin="20" CanDragItems="True" SelectionMode="Extended" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted">
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Name="FileListItem" Tapped="FileListItem_Tapped" DoubleTapped="FileListItem_DoubleTapped">
-                        <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
-                        <TextBlock Text="{Binding DisplayType}" FontWeight="Normal" />
+                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
+                            <TextBlock Text="{Binding FileType}" FontWeight="Normal" />
                             <TextBlock Text="{Binding DateCreated}" FontWeight="Normal" />
                         </StackPanel>
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
-            <Grid Name="FileReception" Background="Azure" Grid.Row="1">
-                <TextBlock Name="FileReceptionIndicator" HorizontalAlignment="Center" VerticalAlignment="Center">doc onlook</TextBlock>
-                <TextBlock Name="TestOutput">test</TextBlock>
-                <Button Name="TestButton"></Button>
+            <Button Name="LoadAll" Grid.Row="1" Tapped="LoadAll_Tapped">
+                <SymbolIcon Symbol="Refresh"/>
+            </Button>
+            <Grid Name="FileReception" Background="Azure" Grid.Row="2" Margin="0,2,0,0">
+                <AutoSuggestBox Name="SuggestBox" PlaceholderText="Search your files" QueryIcon="Find" TextChanged="AutoSuggestBox_TextChanged" QuerySubmitted="AutoSuggestBox_QuerySubmitted" SuggestionChosen="AutoSuggestBox_SuggestionChosen" Margin="0,0,79,0"></AutoSuggestBox>
+                <TextBlock Name="FileReceptionIndicator" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="11,0,10,10" Width="286">File reception</TextBlock>
             </Grid>
         </Grid>
 
         <Grid Grid.Row="0" Grid.Column="1" Background="#FFFFBAC6">
             <StackPanel Name="DragPanel" Canvas.ZIndex="-1" Background="#FFFF1E1E" Opacity="0.2"  AllowDrop="True" DragOver="WorkspacePivot_DragOver" Drop="WorkspacePivot_Drop">
                 <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,200,0,0">Drag here for new tab</TextBlock>
-            </StackPanel> 
+            </StackPanel>
             <Pivot Name="WorkspacePivot">
                 <Pivot.Items>
                 </Pivot.Items>
