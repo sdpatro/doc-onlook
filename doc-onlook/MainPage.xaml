@@ -17,12 +17,12 @@
                 <RowDefinition Height="9*"></RowDefinition>
                 <RowDefinition Height="*"></RowDefinition>
             </Grid.RowDefinitions>
-            <ListView Name="LocalListView" Margin="20">
+            <ListView Name="LocalListView" Margin="20" CanDragItems="True" SelectionMode="Extended" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted">
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Name="FileListItem" Tapped="FileListItem_Tapped" DoubleTapped="FileListItem_DoubleTapped">
-                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
-                            <TextBlock Text="{Binding FileType}" FontWeight="Normal" />
+                        <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
+                        <TextBlock Text="{Binding DisplayType}" FontWeight="Normal" />
                             <TextBlock Text="{Binding DateCreated}" FontWeight="Normal" />
                         </StackPanel>
                     </DataTemplate>
@@ -36,6 +36,9 @@
         </Grid>
 
         <Grid Grid.Row="0" Grid.Column="1" Background="#FFFFBAC6">
+            <StackPanel Name="DragPanel" Canvas.ZIndex="-1" Background="#FFFF1E1E" Opacity="0.2"  AllowDrop="True" DragOver="WorkspacePivot_DragOver" Drop="WorkspacePivot_Drop">
+                <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,200,0,0">Drag here for new tab</TextBlock>
+            </StackPanel> 
             <Pivot Name="WorkspacePivot">
                 <Pivot.Items>
                 </Pivot.Items>
@@ -43,6 +46,7 @@
             <CommandBar VerticalAlignment="Bottom">
                 <AppBarButton x:Name="SaveToDeviceBtn" Label="Save to Device" VerticalAlignment="Top" Icon="SaveLocal" Click="SaveToDeviceBtn_Click"/>
                 <AppBarButton x:Name="NewTabBtn" Label="New Tab" VerticalAlignment="Top" Icon="Add" Tapped="NewTabBtn_Tapped_1"/>
+                <AppBarButton x:Name="CloseTabBtn" Label="Close Tab" VerticalAlignment="Top" Icon="Cancel" Tapped="CloseTabBtn_Tapped"/>
             </CommandBar>
         </Grid>
     </Grid>

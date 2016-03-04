@@ -18,17 +18,13 @@ using System.Text.RegularExpressions;
 using Windows.ApplicationModel.Core;
 using Windows.UI.Core;
 using System.Net;
+using Windows.ApplicationModel.DataTransfer;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
 namespace doc_onlook
 {
-    /// <summary>
-    /// An empty page that can be used on its own or navigated to within a Frame.
-    /// </summary>
     
-    
-
     public sealed partial class MainPage : Page
     {
 
@@ -44,8 +40,6 @@ namespace doc_onlook
         {
             UpdateLocalList();
             workspace = new Workspace(WorkspacePivot);
-            StorageFile file = await GetLocalFile("hello", ".html");
-            workspace.ShowDoc(file);
         }
 
         class Workspace
@@ -53,20 +47,23 @@ namespace doc_onlook
             private List<string> workspaceList { get; set; }
             private Pivot workspacePivot { get; set; }
 
-            public void addToList(string fileName)
+            public async void AddToList(string fileName)
             {
                 workspaceList.Add(fileName);
-                
-                workspacePivot.Items.Add(CreateWorkspaceItem(fileName));
-            }
+                PivotItem item = CreateWorkspaceItem(fileName);
+                workspacePivot.Items.Add(item);
 
-            private object CreateWorkspaceItem(string fileName)
+                StorageFile file = await ApplicationData.Current.LocalFolder.GetFileAsync(fileName);
+                SetPivotItemContent(workspaceList.Count - 1, file);
+            }
+            private PivotItem CreateWorkspaceItem(string fileName)
             {
                 PivotItem newItem = new PivotItem();
                 newItem.Header = fileName;
                 newItem.Content = new Grid();
                 Grid grid = (Grid)newItem.Content;
-                grid.Children.Add(new WebView());
+                WebView webView = new WebView();
+                grid.Children.Add(webView);
 
                 return newItem;
             }
@@ -75,12 +72,13 @@ namespace doc_onlook
             {
                 workspaceList.Remove(fileName);
             }
-
+            
             public void RemoveCurrent()
             {
                 if (workspaceList.Count > 1)
                 {
                     workspaceList.RemoveAt(workspacePivot.SelectedIndex);
+                    workspacePivot.Items.RemoveAt(workspacePivot.SelectedIndex);
                 }
             }
 
@@ -116,7 +114,7 @@ namespace doc_onlook
             {
                 this.workspacePivot = workspacePivot;
                 workspaceList = new List<string>();
-                addToList("hello");
+                AddToList("hello.html");
             }
         };
 
@@ -199,13 +197,6 @@ namespace doc_onlook
             string fileName = ((TextBlock)fileItem.Children[0]).Text;
             string fileType = ((TextBlock)fileItem.Children[1]).Text;
             StorageFile localFile = await GetLocalFile(fileName, fileType);
-            workspace.ShowDoc(localFile);
-        }
-
-        public async void DisplayDoc(StorageFile localFile)
-        {
-            var read = await FileIO.ReadTextAsync(localFile);
-            var CurrentFileBuffer = read;
             workspace.ShowDoc(localFile);
         }
 
@@ -387,7 +378,51 @@ namespace doc_onlook
 
         private void NewTabBtn_Tapped_1(object sender, TappedRoutedEventArgs e)
         {
-            workspace.addToList("something");
+            workspace.AddToList("hello.html");
         }
+
+        private void CloseTabBtn_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            workspace.RemoveCurrent();
+        }
+
+        private void DragPanelStatus(bool status)
+        {
+            if (status == true)
+            {
+                DragPanel.Opacity = 0.7;
+                DragPanel.SetValue(Canvas.ZIndexProperty, 1);
+            }
+            else
+            {
+                DragPanel.Opacity = 0.2;
+                DragPanel.SetValue(Canvas.ZIndexProperty, -1);
+            }
+        }
+
+        private void WorkspacePivot_DragOver(object sender, DragEventArgs e)
+        {
+            e.AcceptedOperation = DataPackageOperation.Copy;
+        }
+
+        private async void WorkspacePivot_Drop(object sender, DragEventArgs e)
+        {
+            var fileName = await e.DataView.GetTextAsync();
+            TestOutput.Text = fileName;
+            workspace.AddToList(fileName);
+            DragPanelStatus(false);
+        }
+
+        private void LocalListView_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
+        {
+            DragPanelStatus(false);
+        }
+        private void ListView_DragStarting(object sender, DragItemsStartingEventArgs e)
+        {
+            e.Data.SetText(((StorageFile)e.Items[0]).DisplayName+((StorageFile)e.Items[0]).FileType);
+            e.Data.RequestedOperation = DataPackageOperation.Copy;
+            DragPanelStatus(true);
+        }
+
     }
 }
