@@ -16,7 +16,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="9*"></RowDefinition>
                 <RowDefinition Height="1*"></RowDefinition>
-                <RowDefinition Height="1.2*"></RowDefinition>
+                <RowDefinition Height="1.5*"></RowDefinition>
             </Grid.RowDefinitions>
             <ListView Name="LocalListView" Margin="20" CanDragItems="True" SelectionMode="Extended" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted">
                 <ListView.ItemTemplate>
@@ -47,6 +47,16 @@
                 </Pivot.Items>
             </Pivot>
             <CommandBar VerticalAlignment="Bottom">
+                <AppBarButton x:Name="ShareMailBtn" Label="Share" VerticalAlignment="Top"  Click="ShareMailBtn_Click">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE72D;"/>
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="SaveToCloudBtn" Label="Save to Cloud" VerticalAlignment="Top" Click="SaveToDeviceBtn_Click">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE753;"/>
+                    </AppBarButton.Icon>
+                </AppBarButton>
                 <AppBarButton x:Name="SaveToDeviceBtn" Label="Save to Device" VerticalAlignment="Top" Icon="SaveLocal" Click="SaveToDeviceBtn_Click"/>
                 <AppBarButton x:Name="NewTabBtn" Label="New Tab" VerticalAlignment="Top" Icon="Add" Tapped="NewTabBtn_Tapped_1"/>
                 <AppBarButton x:Name="CloseTabBtn" Label="Close Tab" VerticalAlignment="Top" Icon="Cancel" Tapped="CloseTabBtn_Tapped"/>

@@ -19,6 +19,7 @@ using Windows.ApplicationModel.Core;
 using Windows.UI.Core;
 using System.Net;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Foundation;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -227,15 +228,15 @@ namespace doc_onlook
             StackPanel fileItem = (StackPanel)sender;
             string fileName = ((TextBlock)fileItem.Children[0]).Text;
             string fileType = ((TextBlock)fileItem.Children[1]).Text;
-            StorageFile localFile = await GetLocalFile(fileName, fileType);
+            StorageFile localFile = await GetLocalFile(fileName+fileType);
             workspace.ShowDoc(localFile);
         }
 
-        public async Task<StorageFile> GetLocalFile(string fileName, string fileType)
+        public async Task<StorageFile> GetLocalFile(string fileName)
         {
             try
             {
-                StorageFile localFile = await ApplicationData.Current.LocalFolder.GetFileAsync(fileName+fileType);
+                StorageFile localFile = await ApplicationData.Current.LocalFolder.GetFileAsync(fileName);
                 return localFile;
             }
             catch(Exception exc){
@@ -504,7 +505,7 @@ namespace doc_onlook
                 if (storageFileItem.DisplayName == selectedName)
                 {
                     WorkspacePivot.Focus(FocusState.Pointer);
-                    StorageFile file = await GetLocalFile(selectedName,storageFileItem.FileType);
+                    StorageFile file = await GetLocalFile(selectedName+storageFileItem.FileType);
                     workspace.ShowDoc(file);
                     break;
                 }
@@ -516,5 +517,35 @@ namespace doc_onlook
             UpdateLocalList();
             ((SymbolIcon)LoadAll.Content).Symbol = Symbol.Refresh;
         }
+
+        private async void ShareMailBtn_Click(object sender, RoutedEventArgs e)
+        {
+            DataTransferManager dataTransferManager = DataTransferManager.GetForCurrentView();
+            dataTransferManager.DataRequested += ShareHtmlHandler;
+            DataTransferManager.ShowShareUI();
+        }
+
+        private async void ShareHtmlHandler(DataTransferManager sender, DataRequestedEventArgs e)
+        {
+            DataRequest request = e.Request;
+            DataRequestDeferral deferral = request.GetDeferral();
+            
+
+            var selectedItem = (PivotItem)WorkspacePivot.SelectedItem;
+            string fileName = (string)selectedItem.Header;
+            StorageFile file = await GetLocalFile(fileName);
+            string HTMLContent;
+
+            HTMLContent = await FileIO.ReadTextAsync(file);
+            char[] splitter = { '.' };
+            string[] contents = fileName.Split(splitter);
+            request.Data.Properties.Title = contents[0];
+            request.Data.Properties.Description = "Share the current file via DocOnlook.";
+            string htmlFormat = HtmlFormatHelper.CreateHtmlFormat(HTMLContent);
+            request.Data.SetHtmlFormat(htmlFormat);
+            deferral.Complete();
+        }
+
+        
     }
 }
