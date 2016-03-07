@@ -7,7 +7,6 @@ using System.Diagnostics;
 using Windows.Storage;
 using Windows.UI.Popups;
 using Windows.Storage.Pickers;
-using Windows.Storage.Provider;
 using Windows.Storage.Search;
 using System.Threading.Tasks;
 using Windows.Networking.Sockets;
@@ -19,7 +18,8 @@ using Windows.ApplicationModel.Core;
 using Windows.UI.Core;
 using System.Net;
 using Windows.ApplicationModel.DataTransfer;
-using Windows.Foundation;
+using Windows.UI.Xaml.Media.Imaging;
+using Windows.Graphics.Imaging;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -32,9 +32,9 @@ namespace doc_onlook
         Workspace workspace;
         List<StorageFile> localFilesList;
         List<StorageFile> localFilesList_queried;
+        List<string> _matchingNamesList;
         List<string> fileNameList;
-        List<string> indexedWords;
-        string _type;
+        
 
         public MainPage()
         {
@@ -66,6 +66,7 @@ namespace doc_onlook
             WriteUniqueFileToLocal(dict);
 
             fileNameList = new List<string>();
+            _matchingNamesList = new List<string>();
         }
 
         class Workspace
@@ -84,13 +85,13 @@ namespace doc_onlook
             }
             private PivotItem CreateWorkspaceItem(string fileName)
             {
+                
                 PivotItem newItem = new PivotItem();
                 newItem.Header = fileName;
-                newItem.Content = new Grid();
-                Grid grid = (Grid)newItem.Content;
-                WebView webView = new WebView();
-                grid.Children.Add(webView);
-
+                newItem.Content = new StackPanel();
+                StackPanel stackPanel = (StackPanel)newItem.Content;
+                stackPanel.Children.Add(new Image());
+                
                 return newItem;
             }
 
@@ -121,14 +122,80 @@ namespace doc_onlook
                 return workspaceList.Count;
             }
 
+            private async void NotifyUser(string message)
+            {
+                MessageDialog dialog = new MessageDialog(message);
+                await dialog.ShowAsync();
+            }
+
+            private UIElement SetContentType(StackPanel stackPanel, string type)
+            {
+                switch (type)
+                {
+                    case ".html": WebView webView = new WebView();
+                        webView.Height = 500;
+                            stackPanel.Children[0] = webView;
+                        return stackPanel.Children[0];
+                    case ".jpg":
+                        ScrollViewer scrollView = new ScrollViewer();
+
+                        scrollView.Height = 500;
+                        scrollView.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+                        scrollView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+                        scrollView.ZoomMode = ZoomMode.Enabled;
+
+                        Image image = new Image();
+                        image.SizeChanged += ScrollViewImage_Loaded;
+                        image.Stretch = Windows.UI.Xaml.Media.Stretch.Uniform;
+                        scrollView.Content = image;
+                        
+                        stackPanel.Children[0] = scrollView;           
+                        return image;
+                    default:
+                        return null;
+                }
+            }
+
+            private void ScrollViewImage_Loaded(object sender, RoutedEventArgs e)
+            {
+                Image image = (Image)sender;
+                ScrollViewer scrollView = (ScrollViewer)image.Parent;
+
+                if(image.ActualHeight > image.ActualWidth)
+                {
+                    scrollView.ZoomToFactor((float)scrollView.ViewportHeight / (float)image.ActualHeight);
+                }
+                else
+                {
+                    scrollView.ZoomToFactor((float)scrollView.ViewportWidth / (float)image.ActualWidth);
+                }
+            }
+
             public async void SetPivotItemContent(int index, StorageFile file)
             {
                 PivotItem pivotItem = (PivotItem)workspacePivot.Items[index];
-                Grid grid = (Grid)pivotItem.Content;
+                
+                StackPanel stackPanel = (StackPanel)pivotItem.Content;
                 pivotItem.Header = file.DisplayName;
-                WebView webView = (WebView)grid.Children[0];
-                var buffer = await FileIO.ReadTextAsync(file);
-                webView.NavigateToString(buffer);
+
+                switch (file.FileType)
+                {
+                    case ".html":
+                                WebView webView = (WebView)SetContentType(stackPanel,".html");
+                                var buffer = await FileIO.ReadTextAsync(file);
+                                webView.NavigateToString(buffer);
+                                break;
+                    case ".jpg":
+                                Image image = (Image)SetContentType(stackPanel,".jpg");
+                                var fileStream = await file.OpenAsync(FileAccessMode.Read);
+                                var img = new BitmapImage();
+                                img.SetSource(fileStream);
+                                image.Source = img;
+                                break;
+                    default: NotifyUser("Error: File extension not found.");
+                        break;
+                }
+                
             }
 
             public void ShowDoc(StorageFile file)
@@ -189,25 +256,15 @@ namespace doc_onlook
             {
                 FileSavePicker savePicker = new FileSavePicker();
                 savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-                savePicker.FileTypeChoices.Add("Plain Text", new List<string>() { ".txt" });
-                savePicker.SuggestedFileName = "New Document";
+                StorageFile file = await GetLocalFile((string)((PivotItem)WorkspacePivot.SelectedItem).Header);
+                savePicker.FileTypeChoices.Add(file.DisplayType, new List<string>() { file.FileType });
+                savePicker.SuggestedFileName = file.DisplayName;
 
-                StorageFile file = await savePicker.PickSaveFileAsync();
+                StorageFile newFile = await savePicker.PickSaveFileAsync();
                 if (file != null)
                 {
-                    CachedFileManager.DeferUpdates(file);
-                    await FileIO.WriteTextAsync(file, file.Name);
-                    FileUpdateStatus status = await CachedFileManager.CompleteUpdatesAsync(file);
-                    if (status == FileUpdateStatus.Complete)
-                    {
-                        MessageDialog dialog = new MessageDialog("File Saved.");
-                        await dialog.ShowAsync();
-                    }
-                    else
-                    {
-                        MessageDialog dialog = new MessageDialog("We couldn't save the file.");
-                        await dialog.ShowAsync();
-                    }
+                    await file.CopyAndReplaceAsync(newFile);
+                    NotifyUser("File copied successfully");
                 }
                 else
                 {
@@ -228,6 +285,7 @@ namespace doc_onlook
             StackPanel fileItem = (StackPanel)sender;
             string fileName = ((TextBlock)fileItem.Children[0]).Text;
             string fileType = ((TextBlock)fileItem.Children[1]).Text;
+            
             StorageFile localFile = await GetLocalFile(fileName+fileType);
             workspace.ShowDoc(localFile);
         }
@@ -287,7 +345,7 @@ namespace doc_onlook
             {
                 return int.Parse(match.Groups[1].Value);
             }
-            return 0;
+            return 0;   
         }
 
         public IDictionary<string,string> ParseContent(string content)
@@ -298,7 +356,6 @@ namespace doc_onlook
             Match m = r.Match(content);
             while (m.Success)
             {
-                Debug.WriteLine("Match "+m.Groups[1].Value+" "+m.Groups[2].Value);
                 contentDict.Add(new KeyValuePair<string, string>(WebUtility.UrlDecode(m.Groups[1].Value), WebUtility.UrlDecode(m.Groups[2].Value)));
                 m = m.NextMatch();
             }
@@ -313,14 +370,32 @@ namespace doc_onlook
             
             StorageFile newFile = await localFolder.CreateFileAsync(ContentData["name"] + ContentData["type"], CreationCollisionOption.GenerateUniqueName);
 
-            using (IRandomAccessStream textStream = await newFile.OpenAsync(FileAccessMode.ReadWrite))
+            switch (ContentData["type"])
             {
-                using (DataWriter textWriter = new DataWriter(textStream))
-                {
-                    textWriter.WriteString(ContentData["data"]);
-                    await textWriter.StoreAsync();
-                }
+                case ".html": using (IRandomAccessStream textStream = await newFile.OpenAsync(FileAccessMode.ReadWrite))
+                              {
+                                    using (DataWriter textWriter = new DataWriter(textStream))
+                                    {
+                                        textWriter.WriteString(ContentData["data"]);
+                                        await textWriter.StoreAsync();
+                                    }
+                              }
+                            break;
+                case ".jpg":   using (IRandomAccessStream textStream = await newFile.OpenAsync(FileAccessMode.ReadWrite))
+                                {
+                                    using (DataWriter textWriter = new DataWriter(textStream))
+                                    {
+                                        var bytes = Convert.FromBase64String(ContentData["data"]);
+                                        textWriter.WriteBytes(bytes);
+                                        await textWriter.StoreAsync();
+                                    }
+                                }
+                            break;
+                default: NotifyUser("Can't write file");
+                    break;
             }
+
+            
             
         }
 
@@ -364,12 +439,10 @@ namespace doc_onlook
                         byte[] tmpBuf = new byte[numReadBytes];
                         reader.ReadBytes(tmpBuf);
                         string result = Encoding.UTF8.GetString(tmpBuf).TrimEnd('\0');
-                        Debug.WriteLine("Result: " + result);
                         string[] contents = Regex.Split(result,"\r\n\r\n");
                         if (GetContentLength(result)!= 0)
                         {
                             contentLength = GetContentLength(result);
-                            Debug.WriteLine("Total content length: " + contentLength);
                         }
                         string content;
                         if (contents.Length > 1)
@@ -384,7 +457,6 @@ namespace doc_onlook
                         UpdateFileReceptionStatus("Receiving: "+(totalContent.Length*100 / contentLength) + "%");
                         if (totalContent.Length == contentLength)
                         {
-                            Debug.WriteLine("Read all data: "+totalContent);
                             var ContentData = ParseContent(totalContent);
                             UpdateFileReceptionStatus("File received.");
                             WriteFileToLocal(ContentData);
@@ -399,17 +471,16 @@ namespace doc_onlook
                     }
                 } while (numReadBytes > 0);
             }
-            Debug.WriteLine("Finished reading");
         }
 
-        private async void DeleteLocalFile(string name, string type)
+        private async void DeleteLocalFile(string name)
         {
             try
             {
                 StorageFolder localFolder = ApplicationData.Current.LocalFolder;
-                StorageFile file = await localFolder.GetFileAsync(name+type);
+                StorageFile file = await localFolder.GetFileAsync(name);
                 await file.DeleteAsync();
-                fileNameList.Remove(name + type);
+                fileNameList.Remove(name);
                 NotifyUser("File deleted.");
                 
                 UpdateLocalList();
@@ -418,14 +489,6 @@ namespace doc_onlook
             {
                 NotifyUser("Exception: " + e.ToString());
             }
-        }
-
-        private void FileListItem_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
-        {
-            StackPanel stackElement = (StackPanel)sender;
-            TextBlock name = (TextBlock)stackElement.Children[0];
-            TextBlock type = (TextBlock)stackElement.Children[1];
-            DeleteLocalFile(name.Text,type.Text);
         }
 
         private void NewTabBtn_Tapped_1(object sender, TappedRoutedEventArgs e)
@@ -477,9 +540,18 @@ namespace doc_onlook
 
         private void AutoSuggestBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
         {
+            _matchingNamesList.Clear();
+            foreach(string name in fileNameList)
+            {
+                if ((name.ToLower()).Contains((SuggestBox.Text).ToLower()))
+                {
+                    _matchingNamesList.Add(name);
+                }
+            }
             if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
             {
-                sender.ItemsSource = fileNameList;
+                sender.ItemsSource = null;
+                sender.ItemsSource = _matchingNamesList;
             }
         }
 
@@ -518,14 +590,14 @@ namespace doc_onlook
             ((SymbolIcon)LoadAll.Content).Symbol = Symbol.Refresh;
         }
 
-        private async void ShareMailBtn_Click(object sender, RoutedEventArgs e)
+        private void ShareMailBtn_Click(object sender, RoutedEventArgs e)
         {
             DataTransferManager dataTransferManager = DataTransferManager.GetForCurrentView();
-            dataTransferManager.DataRequested += ShareHtmlHandler;
+            dataTransferManager.DataRequested += ShareMailHandler;
             DataTransferManager.ShowShareUI();
         }
 
-        private async void ShareHtmlHandler(DataTransferManager sender, DataRequestedEventArgs e)
+        private async void ShareMailHandler(DataTransferManager sender, DataRequestedEventArgs e)
         {
             DataRequest request = e.Request;
             DataRequestDeferral deferral = request.GetDeferral();
@@ -534,18 +606,43 @@ namespace doc_onlook
             var selectedItem = (PivotItem)WorkspacePivot.SelectedItem;
             string fileName = (string)selectedItem.Header;
             StorageFile file = await GetLocalFile(fileName);
-            string HTMLContent;
 
-            HTMLContent = await FileIO.ReadTextAsync(file);
             char[] splitter = { '.' };
             string[] contents = fileName.Split(splitter);
             request.Data.Properties.Title = contents[0];
             request.Data.Properties.Description = "Share the current file via DocOnlook.";
-            string htmlFormat = HtmlFormatHelper.CreateHtmlFormat(HTMLContent);
-            request.Data.SetHtmlFormat(htmlFormat);
+            
+            switch (file.FileType)
+            {
+                case ".html":
+                            string HTMLContent;
+                            HTMLContent = await FileIO.ReadTextAsync(file);
+                            string htmlFormat = HtmlFormatHelper.CreateHtmlFormat(HTMLContent);
+                            request.Data.SetHtmlFormat(htmlFormat);
+                            break;
+                case ".jpg":
+                            RandomAccessStreamReference imageStreamRef = RandomAccessStreamReference.CreateFromFile(file);
+                            request.Data.SetBitmap(imageStreamRef);
+                            break;
+            }
+
+            
             deferral.Complete();
         }
 
-        
+        private void ShowDebugInfoBtn_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            PivotItem pivotItem = (PivotItem)WorkspacePivot.Items[0];
+            StackPanel stackPanel = (StackPanel)pivotItem.Content;
+            Image image = (Image)(((ScrollViewer)stackPanel.Children[0]).Content);
+            NotifyUser(image.Height + " " + image.Width + " " + image.ActualHeight + " " + image.ActualWidth);
+        }
+
+        private void DeleteBtn_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            PivotItem pivotItem = (PivotItem)WorkspacePivot.Items[WorkspacePivot.SelectedIndex];
+            string fileName = (string)pivotItem.Header;
+            DeleteLocalFile(fileName);
+        }
     }
 }
