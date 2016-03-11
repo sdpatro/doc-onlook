@@ -19,7 +19,11 @@ using Windows.UI.Core;
 using System.Net;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.UI.Xaml.Media.Imaging;
-using Windows.Graphics.Imaging;
+using Windows.System;
+using Windows.UI.ViewManagement;
+using Newtonsoft.Json;
+using Windows.Networking.Connectivity;
+using System.Linq;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -34,13 +38,15 @@ namespace doc_onlook
         List<StorageFile> localFilesList_queried;
         List<string> _matchingNamesList;
         List<string> fileNameList;
+        StreamSocketListener _listener;
+        string IP_info;
+        
         
 
         public MainPage()
         {
-            
-            InitializeData();
             InitializeComponent();
+            InitializeData();
             FillWorkspace();
             RunTCPListener();
         }
@@ -52,6 +58,44 @@ namespace doc_onlook
             workspace.AddToList("hello.html");
 
             WorkspacePivot.Focus(FocusState.Pointer);
+        }
+
+
+        private void InitializeIPInfo()
+        {
+            var icp = NetworkInformation.GetInternetConnectionProfile();
+
+            if (icp != null && icp.NetworkAdapter != null)
+            {
+                var hostIP =
+                    NetworkInformation.GetHostNames()
+                        .SingleOrDefault(
+                            hn =>
+                            hn.IPInformation != null && hn.IPInformation.NetworkAdapter != null
+                            && hn.IPInformation.NetworkAdapter.NetworkAdapterId
+                            == icp.NetworkAdapter.NetworkAdapterId);
+
+                var hostNamesList = NetworkInformation.GetHostNames();
+                string hostName = null;
+
+                foreach (var entry in hostNamesList)
+                {
+                    if (entry.Type == Windows.Networking.HostNameType.DomainName)
+                    {
+                        hostName = entry.CanonicalName;
+                    }
+                }
+
+                if (hostIP!=null && hostName!=null)
+                {
+                    IPInfo.Text = hostIP.ToString() + " " + hostName;
+                    IP_info = IPInfo.Text;
+                }
+                else
+                {
+                    IPInfo.Text = "Couldn't initialize IP information";
+                }
+            }
         }
 
         private void InitializeData()
@@ -67,6 +111,8 @@ namespace doc_onlook
 
             fileNameList = new List<string>();
             _matchingNamesList = new List<string>();
+
+            InitializeIPInfo();
         }
 
         class Workspace
@@ -83,6 +129,7 @@ namespace doc_onlook
                 StorageFile file = await ApplicationData.Current.LocalFolder.GetFileAsync(fileName);
                 SetPivotItemContent(workspaceList.Count - 1, file);
             }
+
             private PivotItem CreateWorkspaceItem(string fileName)
             {
                 
@@ -128,27 +175,33 @@ namespace doc_onlook
                 await dialog.ShowAsync();
             }
 
+            private void SetScrollViewerProperties(ScrollViewer scrollView, StackPanel stackPanel)
+            {
+                scrollView.Height = stackPanel.Height;
+                scrollView.Width = stackPanel.Width;
+
+                scrollView.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+                scrollView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+                scrollView.ZoomMode = ZoomMode.Enabled;
+            }
+
             private UIElement SetContentType(StackPanel stackPanel, string type)
             {
                 switch (type)
                 {
                     case ".html": WebView webView = new WebView();
-                        webView.Height = 500;
-                            stackPanel.Children[0] = webView;
+                        webView.DOMContentLoaded += DOMContentLoaded;
+                        stackPanel.Children[0] = webView;
                         return stackPanel.Children[0];
                     case ".jpg":
                         ScrollViewer scrollView = new ScrollViewer();
-
-                        scrollView.Height = 500;
-                        scrollView.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
-                        scrollView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-                        scrollView.ZoomMode = ZoomMode.Enabled;
+                        SetScrollViewerProperties(scrollView, stackPanel);
 
                         Image image = new Image();
                         image.SizeChanged += ScrollViewImage_Loaded;
                         image.Stretch = Windows.UI.Xaml.Media.Stretch.Uniform;
-                        scrollView.Content = image;
-                        
+
+                        scrollView.Content = image;                        
                         stackPanel.Children[0] = scrollView;           
                         return image;
                     default:
@@ -169,6 +222,13 @@ namespace doc_onlook
                 {
                     scrollView.ZoomToFactor((float)scrollView.ViewportWidth / (float)image.ActualWidth);
                 }
+
+                scrollView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50; 
+            }
+
+            private void DOMContentLoaded(WebView webView, WebViewDOMContentLoadedEventArgs args)
+            {
+                webView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50;
             }
 
             public async void SetPivotItemContent(int index, StorageFile file)
@@ -216,6 +276,7 @@ namespace doc_onlook
         public async void UpdateLocalList()
         {
             localFilesList = await GetLocalFiles();
+            fileNameList.Clear();
             foreach (StorageFile file in localFilesList)
             {
                 if(fileNameList.IndexOf(file.DisplayName) == -1)
@@ -306,9 +367,9 @@ namespace doc_onlook
 
         public async void RunTCPListener()
         {
-            StreamSocketListener listener = new StreamSocketListener();
-            await listener.BindServiceNameAsync("2112");
-            listener.ConnectionReceived += OnConnection;
+            _listener = new StreamSocketListener();
+            await _listener.BindServiceNameAsync("2112");
+            _listener.ConnectionReceived += OnConnection;
         }
 
         public async void NotifyUser(string Message)
@@ -416,60 +477,112 @@ namespace doc_onlook
 
         }
 
+        private string BuildPostResponse(string responseType, string fileSize, string timeTaken)
+        {
+            string responseString = "HTTP/1.1 200 OK";
+            responseString += "\r\nAccess-Control-Allow-Origin: *";
+            responseString += "\r\nContent-Type: application/x-www-form-urlencoded; charset=UTF-8";
+            responseString += "\r\n";
+            responseString += "\r\n";
+
+            Dictionary<string, string> dict = new Dictionary<string, string>();
+
+            switch (responseType)
+            {
+                case "FIND_DEVICE": dict["Message"] = "SUCCESS";
+                    dict["DeviceInfo"] = IP_info;
+                    break;
+
+                case "SEND_FILE":
+                    dict["Message"] = "SUCCESS";
+                    dict["FileSize"] = fileSize;
+                    dict["TimeTaken"] = timeTaken;
+                    break;
+            }
+            
+            responseString += JsonConvert.SerializeObject(dict);
+            return responseString;
+        }
+
 
         private async void OnConnection( StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
         {
-            using (IInputStream inStream = args.Socket.InputStream)
+            try
             {
-                UpdateFileReceptionStatus("Receving new file...");
-                DataReader reader = new DataReader(inStream);
-                reader.InputStreamOptions = InputStreamOptions.Partial;
-                int contentLength = 0;
-                uint numReadBytes;
-                string totalContent = "";
-
-                IOutputStream outStream = args.Socket.OutputStream;
-
-                do
+                using (IInputStream inStream = args.Socket.InputStream)
                 {
-                    numReadBytes = await reader.LoadAsync(1 << 20);  
 
-                    if (numReadBytes > 0)
+                    UpdateFileReceptionStatus("Receving new file...");
+                    DataReader reader = new DataReader(inStream);
+                    reader.InputStreamOptions = InputStreamOptions.Partial;
+                    int contentLength = 0;
+                    uint numReadBytes;
+                    string totalContent = "";
+                    DateTime timeStart = DateTime.Now;
+
+                    IOutputStream outStream = args.Socket.OutputStream;
+
+                    do
                     {
-                        byte[] tmpBuf = new byte[numReadBytes];
-                        reader.ReadBytes(tmpBuf);
-                        string result = Encoding.UTF8.GetString(tmpBuf).TrimEnd('\0');
-                        string[] contents = Regex.Split(result,"\r\n\r\n");
-                        if (GetContentLength(result)!= 0)
+                        numReadBytes = await reader.LoadAsync(1 << 20);
+                        Debug.WriteLine(numReadBytes);
+
+                        if (numReadBytes > 0)
                         {
-                            contentLength = GetContentLength(result);
+                            byte[] tmpBuf = new byte[numReadBytes];
+                            reader.ReadBytes(tmpBuf);
+                            string result = Encoding.UTF8.GetString(tmpBuf).TrimEnd('\0');
+                            string[] contents = Regex.Split(result, "\r\n\r\n");
+                            if (GetContentLength(result) != 0)
+                            {
+                                contentLength = GetContentLength(result);
+                            }
+                            string content;
+                            if (contents.Length > 1)
+                            {
+                                content = contents[1];
+                            }
+                            else
+                            {
+                                content = contents[0];
+                            }
+                            totalContent += content;
+                            UpdateFileReceptionStatus("Receiving: " + (totalContent.Length * 100 / contentLength) + "%");
+                            if (totalContent.Length == contentLength)
+                            {
+
+                                UpdateFileReceptionStatus("Processing the stuff received...");
+                                var ContentData = ParseContent(totalContent);
+                                string param_fileSize = "";
+                                string param_timeTaken = "";
+                                if (ContentData["action"] == "FIND_DEVICE")
+                                {
+                                    UpdateFileReceptionStatus("Pinged by a sender.");
+                                }
+                                else
+                                {
+                                    param_fileSize = (ContentData["data"].Length).ToString();
+                                    TimeSpan diff = DateTime.Now - timeStart;
+                                    param_timeTaken = diff.TotalSeconds.ToString();
+                                    UpdateFileReceptionStatus("Writing to your storage...");
+                                    WriteFileToLocal(ContentData);
+                                    UpdateFileReceptionStatus("Done!");
+                                    UpdateLocalList_Thread();
+                                }
+
+                                IBuffer replyBuff = Encoding.ASCII.GetBytes(BuildPostResponse(ContentData["action"],param_fileSize,param_timeTaken)).AsBuffer();
+                                await outStream.WriteAsync(replyBuff);
+                                reader.DetachStream();
+                                args.Socket.Dispose();
+                                break;
+                            }
                         }
-                        string content;
-                        if (contents.Length > 1)
-                        {
-                            content = contents[1];
-                        }
-                        else
-                        {
-                            content = contents[0];
-                        }
-                        totalContent += content;
-                        UpdateFileReceptionStatus("Receiving: "+(totalContent.Length*100 / contentLength) + "%");
-                        if (totalContent.Length == contentLength)
-                        {
-                            var ContentData = ParseContent(totalContent);
-                            UpdateFileReceptionStatus("File received.");
-                            WriteFileToLocal(ContentData);
-                            UpdateLocalList_Thread();
-                            string responseString = "HTTP/1.1 200 OK";
-                            tmpBuf = Encoding.ASCII.GetBytes(responseString);
-                            IBuffer replyBuff = tmpBuf.AsBuffer();
-                            await outStream.WriteAsync(replyBuff);
-                            break;
-                        }
-                        
-                    }
-                } while (numReadBytes > 0);
+                    } while (true);
+                }
+            }
+            catch(Exception e)
+            {
+                NotifyUser_Thread(e.StackTrace);
             }
         }
 
@@ -510,7 +623,7 @@ namespace doc_onlook
             }
             else
             {
-                DragPanel.Opacity = 0.2;
+                DragPanel.Opacity = 0;
                 DragPanel.SetValue(Canvas.ZIndexProperty, -1);
             }
         }
@@ -644,5 +757,22 @@ namespace doc_onlook
             string fileName = (string)pivotItem.Header;
             DeleteLocalFile(fileName);
         }
+
+        private async void OpenFileBtn_Click(object sender, RoutedEventArgs e)
+        {
+            PivotItem pivotItem = (PivotItem)WorkspacePivot.Items[WorkspacePivot.SelectedIndex];
+            string fileName = (string)pivotItem.Header;
+
+            StorageFile file = await GetLocalFile(fileName);
+            await Launcher.LaunchFileAsync(file, new LauncherOptions
+            {
+                DisplayApplicationPicker = true,
+                DesiredRemainingView = ViewSizePreference.UseHalf
+            });
+
+            return;
+
+        }
+        
     }
 }

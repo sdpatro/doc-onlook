@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
+using Windows.ApplicationModel.Background;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
+using Windows.Media.SpeechRecognition;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Controls.Primitives;
-using Windows.UI.Xaml.Data;
-using Windows.UI.Xaml.Input;
-using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
 namespace doc_onlook
@@ -30,6 +29,39 @@ namespace doc_onlook
         {
             this.InitializeComponent();
             this.Suspending += OnSuspending;
+            
+        }
+
+        public void CheckBackgroundTasks()
+        {
+            var taskRegistered = false;
+            var exampleTaskName = "ExampleBackgroundTask";
+
+            foreach (var task in BackgroundTaskRegistration.AllTasks)
+            {
+                if (task.Value.Name == exampleTaskName)
+                {
+                    taskRegistered = true;
+                    Debug.WriteLine("BackgroundTask registered...");
+                    break;
+                }
+            }
+        }
+
+        public void RegisterBackgroundTask()
+        {
+            var builder = new BackgroundTaskBuilder();
+
+            builder.Name = "ExampleBackgroundTask";
+            builder.TaskEntryPoint = "RuntimeComponent1.ExampleBackgroundTask";
+            builder.SetTrigger(new SystemTrigger(SystemTriggerType.InternetAvailable, false));
+        }
+
+        private async void AttachVCD()
+        {
+            var storageFile = await Windows.Storage.StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///DocOnlookCommands.xml"));
+            await Windows.ApplicationModel.VoiceCommands.VoiceCommandDefinitionManager.InstallCommandDefinitionsFromStorageFileAsync(storageFile);
+            Debug.WriteLine("VCD attached");
         }
 
         /// <summary>
@@ -39,6 +71,7 @@ namespace doc_onlook
         /// <param name="e">Details about the launch request and process.</param>
         protected override void OnLaunched(LaunchActivatedEventArgs e)
         {
+            AttachVCD();
 
 #if DEBUG
             if (System.Diagnostics.Debugger.IsAttached)
@@ -76,6 +109,9 @@ namespace doc_onlook
             }
             // Ensure the current window is active
             Window.Current.Activate();
+
+            RegisterBackgroundTask();
+            CheckBackgroundTasks();
         }
 
         /// <summary>
@@ -101,5 +137,24 @@ namespace doc_onlook
             //TODO: Save application state and stop any background activity
             deferral.Complete();
         }
+
+        override protected void OnActivated(IActivatedEventArgs args)
+        {
+            if (args.Kind == ActivationKind.VoiceCommand)
+            {
+                VoiceCommandActivatedEventArgs commandArgs = args as VoiceCommandActivatedEventArgs;
+                SpeechRecognitionResult speechRecognitionResult = commandArgs.Result;
+
+                string voiceCommandName = speechRecognitionResult.RulePath[0];
+                string textSpoken = speechRecognitionResult.Text;
+                //IReadOnlyList<string> recognizedVoiceCommandPhrases;
+
+                switch (voiceCommandName)
+                {
+                    case "showTheLatestFile": Debug.WriteLine("Show latest file");
+                        break;
+                }
+        }
+    }
     }
 }

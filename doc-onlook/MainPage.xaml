@@ -16,7 +16,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="9*"></RowDefinition>
                 <RowDefinition Height="1*"></RowDefinition>
-                <RowDefinition Height="1.5*"></RowDefinition>
+                <RowDefinition Height="2*"></RowDefinition>
             </Grid.RowDefinitions>
             <ListView Name="LocalListView" Margin="20" CanDragItems="True" SelectionMode="Extended" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted">
                 <ListView.ItemTemplate>
@@ -33,22 +33,23 @@
             <Button Name="LoadAll" Grid.Row="1" Tapped="LoadAll_Tapped">
                 <SymbolIcon Symbol="Refresh"/>
             </Button>
-            <Grid Name="FileReception" Background="Azure" Grid.Row="2" Margin="0,2,0,0">
+            <StackPanel Name="FileReception" Background="Azure" Grid.Row="2" Margin="0,2,0,0">
                 <AutoSuggestBox Name="SuggestBox" PlaceholderText="Search your files" QueryIcon="Find" TextChanged="AutoSuggestBox_TextChanged" QuerySubmitted="AutoSuggestBox_QuerySubmitted" SuggestionChosen="AutoSuggestBox_SuggestionChosen" Margin="0,0,79,0"></AutoSuggestBox>
                 <TextBlock Name="FileReceptionIndicator" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="11,0,10,10" Width="286">File reception</TextBlock>
-            </Grid>
+                <TextBlock Name="IPInfo" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="11,0,10,10" Width="286">IPInfo</TextBlock>
+            </StackPanel>
         </Grid>
 
         <Grid Grid.Row="0" Grid.Column="1" Background="#FFFFBAC6">
-            <StackPanel Name="DragPanel" Canvas.ZIndex="-1" Background="#FFFF1E1E" Opacity="0.2"  AllowDrop="True" DragOver="WorkspacePivot_DragOver" Drop="WorkspacePivot_Drop">
+            <StackPanel Name="DragPanel" Canvas.ZIndex="-1" Background="#FFFF1E1E" Opacity="0"  AllowDrop="True" DragOver="WorkspacePivot_DragOver" Drop="WorkspacePivot_Drop">
                 <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,200,0,0">Drag here for new tab</TextBlock>
             </StackPanel>
             <Pivot Name="WorkspacePivot">
                 <Pivot.Items>
                 </Pivot.Items>
             </Pivot>
-            <CommandBar VerticalAlignment="Bottom">
-                <AppBarButton x:Name="OpenFileBtn" Label="Open file" VerticalAlignment="Top" Icon="OpenFile"  Click="SaveToDeviceBtn_Click"/>
+            <CommandBar Name="FileCommandBar" VerticalAlignment="Bottom">
+                <AppBarButton x:Name="OpenFileBtn" Label="Open file" VerticalAlignment="Top" Icon="OpenFile" Click="OpenFileBtn_Click"/>
                 <AppBarButton x:Name="ShareMailBtn" Label="Share" VerticalAlignment="Top"  Click="ShareMailBtn_Click">
                     <AppBarButton.Icon>
                         <FontIcon Glyph="&#xE72D;"/>
@@ -67,3 +68,5 @@
         </Grid>
     </Grid>
 </Page>
+
+    
