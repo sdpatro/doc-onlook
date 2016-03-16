@@ -55,6 +55,8 @@ namespace doc_onlook
             builder.Name = "ExampleBackgroundTask";
             builder.TaskEntryPoint = "RuntimeComponent1.ExampleBackgroundTask";
             builder.SetTrigger(new SystemTrigger(SystemTriggerType.InternetAvailable, false));
+            WebView webView = new WebView();
+            
         }
 
         private async void AttachVCD()

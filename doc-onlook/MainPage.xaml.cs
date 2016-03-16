@@ -23,7 +23,7 @@ using Windows.System;
 using Windows.UI.ViewManagement;
 using Newtonsoft.Json;
 using Windows.Networking.Connectivity;
-using System.Linq;
+using Windows.Data.Pdf;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -41,8 +41,6 @@ namespace doc_onlook
         StreamSocketListener _listener;
         string IP_info;
         
-        
-
         public MainPage()
         {
             InitializeComponent();
@@ -60,41 +58,39 @@ namespace doc_onlook
             WorkspacePivot.Focus(FocusState.Pointer);
         }
 
-
         private void InitializeIPInfo()
         {
             var icp = NetworkInformation.GetInternetConnectionProfile();
 
             if (icp != null && icp.NetworkAdapter != null)
             {
-                var hostIP =
-                    NetworkInformation.GetHostNames()
-                        .SingleOrDefault(
-                            hn =>
-                            hn.IPInformation != null && hn.IPInformation.NetworkAdapter != null
-                            && hn.IPInformation.NetworkAdapter.NetworkAdapterId
-                            == icp.NetworkAdapter.NetworkAdapterId);
-
                 var hostNamesList = NetworkInformation.GetHostNames();
-                string hostName = null;
-
+                string domainName = null;
+                string v4Name = null;
                 foreach (var entry in hostNamesList)
                 {
-                    if (entry.Type == Windows.Networking.HostNameType.DomainName)
+                    if (entry.Type==Windows.Networking.HostNameType.DomainName && domainName==null)
                     {
-                        hostName = entry.CanonicalName;
+                        domainName = entry.CanonicalName;
+                    }
+                    if(entry.Type == Windows.Networking.HostNameType.Ipv4 && v4Name == null)
+                    {
+                        v4Name = entry.CanonicalName;
                     }
                 }
-
-                if (hostIP!=null && hostName!=null)
+                if (domainName!=null && v4Name!=null)
                 {
-                    IPInfo.Text = hostIP.ToString() + " " + hostName;
+                    IPInfo.Text = domainName + " " + v4Name;
                     IP_info = IPInfo.Text;
                 }
                 else
                 {
                     IPInfo.Text = "Couldn't initialize IP information";
                 }
+            }
+            else
+            {
+                IPInfo.Text = "Couldn't initialize IP information";
             }
         }
 
@@ -132,13 +128,15 @@ namespace doc_onlook
 
             private PivotItem CreateWorkspaceItem(string fileName)
             {
-                
                 PivotItem newItem = new PivotItem();
+                newItem.Height = workspacePivot.Height;
                 newItem.Header = fileName;
+
                 newItem.Content = new StackPanel();
                 StackPanel stackPanel = (StackPanel)newItem.Content;
+                stackPanel.Height = newItem.Height;
                 stackPanel.Children.Add(new Image());
-                
+
                 return newItem;
             }
 
@@ -180,20 +178,26 @@ namespace doc_onlook
                 scrollView.Height = stackPanel.Height;
                 scrollView.Width = stackPanel.Width;
 
+                
                 scrollView.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
                 scrollView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 scrollView.ZoomMode = ZoomMode.Enabled;
             }
 
-            private UIElement SetContentType(StackPanel stackPanel, string type)
+            private UIElement SetContentType(StackPanel stackPanel, string type, uint count)
             {
                 switch (type)
                 {
-                    case ".html": WebView webView = new WebView();
+                    case ".html":
+
+                        stackPanel.Children.Clear();
+                        WebView webView = new WebView();
                         webView.DOMContentLoaded += DOMContentLoaded;
-                        stackPanel.Children[0] = webView;
+                        stackPanel.Children.Add(webView);
                         return stackPanel.Children[0];
+
                     case ".jpg":
+                        stackPanel.Children.Clear();
                         ScrollViewer scrollView = new ScrollViewer();
                         SetScrollViewerProperties(scrollView, stackPanel);
 
@@ -202,8 +206,26 @@ namespace doc_onlook
                         image.Stretch = Windows.UI.Xaml.Media.Stretch.Uniform;
 
                         scrollView.Content = image;                        
-                        stackPanel.Children[0] = scrollView;           
+                        stackPanel.Children.Add(scrollView);           
                         return image;
+
+                    case ".pdf":
+                        stackPanel.Children.Clear();
+                        ScrollViewer pdfScrollView = new ScrollViewer();
+                        pdfScrollView.Width = stackPanel.Width;
+
+                        SetScrollViewerProperties(pdfScrollView, stackPanel);
+                        stackPanel.Children.Add(pdfScrollView);
+                        StackPanel pdfStackPanel = new StackPanel();
+                        pdfScrollView.Content = pdfStackPanel;
+                        pdfStackPanel.Width = pdfScrollView.Width;
+                        for (var i=0; i<count; i++)
+                        {
+                            Image pdfImage = new Image();
+                            pdfStackPanel.Children.Add(pdfImage);
+                        }
+                        return stackPanel;
+                            
                     default:
                         return null;
                 }
@@ -213,10 +235,11 @@ namespace doc_onlook
             {
                 Image image = (Image)sender;
                 ScrollViewer scrollView = (ScrollViewer)image.Parent;
+                StackPanel stackPanel = (StackPanel)scrollView.Parent;
 
-                if(image.ActualHeight > image.ActualWidth)
+                if (image.ActualHeight > image.ActualWidth)
                 {
-                    scrollView.ZoomToFactor((float)scrollView.ViewportHeight / (float)image.ActualHeight);
+                    scrollView.ZoomToFactor((float)scrollView.ActualHeight / (float)image.ActualHeight);
                 }
                 else
                 {
@@ -226,13 +249,54 @@ namespace doc_onlook
                 scrollView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50; 
             }
 
+            private void PdfScrollViewImage_Loaded(object sender, RoutedEventArgs e)
+            {
+                Image image = (Image)sender;
+                PivotItem pivotItem = (PivotItem)workspacePivot.Items[workspacePivot.SelectedIndex];
+                ScrollViewer pdfScrollView = (ScrollViewer)(((StackPanel)pivotItem.Content).Children[0]);
+
+                if (image.ActualHeight > image.ActualWidth)
+                {
+                    pdfScrollView.ZoomToFactor((float)pdfScrollView.ActualHeight / (float)image.ActualHeight);
+                }
+                else
+                {
+                    pdfScrollView.ZoomToFactor((float)pdfScrollView.ViewportWidth / (float)image.ActualWidth);
+                }
+
+                pdfScrollView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50;
+            }
+
             private void DOMContentLoaded(WebView webView, WebViewDOMContentLoadedEventArgs args)
             {
                 webView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50;
             }
+            
+
+            private async void LoadPdf(PdfDocument pdfDocument, StackPanel stackPanel)
+            {
+                
+
+                for (uint i=0; i<pdfDocument.PageCount; i++)
+                {
+                    PdfPage page = pdfDocument.GetPage(i);
+                    var stream = new InMemoryRandomAccessStream();
+                    await page.RenderToStreamAsync(stream);
+                    BitmapImage pdfImg = new BitmapImage();
+                    pdfImg.SetSource(stream);
+                    Image img = ((Image)(stackPanel.Children[(int)i]));
+                    img.Source = pdfImg;
+                    if (i == 0)
+                    {
+                        img.SizeChanged += PdfScrollViewImage_Loaded;
+                    }
+                }
+                
+            }
 
             public async void SetPivotItemContent(int index, StorageFile file)
             {
+                Debug.WriteLine("SetPivotItemContent");
                 PivotItem pivotItem = (PivotItem)workspacePivot.Items[index];
                 
                 StackPanel stackPanel = (StackPanel)pivotItem.Content;
@@ -241,16 +305,21 @@ namespace doc_onlook
                 switch (file.FileType)
                 {
                     case ".html":
-                                WebView webView = (WebView)SetContentType(stackPanel,".html");
+                                WebView webView = (WebView)SetContentType(stackPanel,".html",0);
                                 var buffer = await FileIO.ReadTextAsync(file);
                                 webView.NavigateToString(buffer);
                                 break;
                     case ".jpg":
-                                Image image = (Image)SetContentType(stackPanel,".jpg");
+                                Image image = (Image)SetContentType(stackPanel,".jpg",0);
                                 var fileStream = await file.OpenAsync(FileAccessMode.Read);
                                 var img = new BitmapImage();
                                 img.SetSource(fileStream);
                                 image.Source = img;
+                                break;
+                    case ".pdf":
+                                PdfDocument pdfDocument = await PdfDocument.LoadFromFileAsync(file);
+                                stackPanel = (StackPanel)SetContentType(stackPanel, ".pdf",pdfDocument.PageCount);
+                                LoadPdf(pdfDocument, ((StackPanel)(((ScrollViewer)(stackPanel.Children[0])).Content)));
                                 break;
                     default: NotifyUser("Error: File extension not found.");
                         break;
@@ -265,7 +334,10 @@ namespace doc_onlook
 
             public Workspace(Pivot workspacePivot)
             {
+                var bounds = Window.Current.Bounds;
+
                 this.workspacePivot = workspacePivot;
+                this.workspacePivot.Height = bounds.Height;
                 workspaceList = new List<string>();
             }
         };
@@ -341,14 +413,24 @@ namespace doc_onlook
             
         }
 
-        private async void FileListItem_Tapped(object sender, TappedRoutedEventArgs e)
+        private async void FileListItem_Tapped(object sender, TappedRoutedEventArgs args)
         {
-            StackPanel fileItem = (StackPanel)sender;
-            string fileName = ((TextBlock)fileItem.Children[0]).Text;
-            string fileType = ((TextBlock)fileItem.Children[1]).Text;
+            try
+            {
+                StackPanel fileItem = (StackPanel)sender;
+                string fileName = ((TextBlock)fileItem.Children[0]).Text;
+                string fileType = ((TextBlock)fileItem.Children[1]).Text;
+
+                StorageFile localFile = await GetLocalFile(fileName + fileType);
+                workspace.ShowDoc(localFile);
+                
+            }
+            catch(Exception e)
+            {
+                NotifyUser("Something occured: " + e.ToString());
+            }
             
-            StorageFile localFile = await GetLocalFile(fileName+fileType);
-            workspace.ShowDoc(localFile);
+            
         }
 
         public async Task<StorageFile> GetLocalFile(string fileName)
@@ -442,6 +524,7 @@ namespace doc_onlook
                                     }
                               }
                             break;
+                case ".pdf":
                 case ".jpg":   using (IRandomAccessStream textStream = await newFile.OpenAsync(FileAccessMode.ReadWrite))
                                 {
                                     using (DataWriter textWriter = new DataWriter(textStream))
@@ -512,7 +595,7 @@ namespace doc_onlook
                 using (IInputStream inStream = args.Socket.InputStream)
                 {
 
-                    UpdateFileReceptionStatus("Receving new file...");
+                    UpdateFileReceptionStatus("Received a connection.");
                     DataReader reader = new DataReader(inStream);
                     reader.InputStreamOptions = InputStreamOptions.Partial;
                     int contentLength = 0;
@@ -525,7 +608,6 @@ namespace doc_onlook
                     do
                     {
                         numReadBytes = await reader.LoadAsync(1 << 20);
-                        Debug.WriteLine(numReadBytes);
 
                         if (numReadBytes > 0)
                         {
@@ -773,6 +855,15 @@ namespace doc_onlook
             return;
 
         }
-        
+
+        public class PdfImage
+        {
+            public BitmapImage bmpImage;
+
+            public PdfImage(BitmapImage img)
+            {
+                bmpImage = img;
+            }
+        }
     }
 }
