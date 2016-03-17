@@ -26,6 +26,7 @@ using Windows.Networking.Connectivity;
 using Windows.Data.Pdf;
 using Windows.UI.Xaml.Media;
 using Windows.Foundation;
+using Windows.Graphics.Imaging;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -42,6 +43,7 @@ namespace doc_onlook
         List<string> fileNameList;
         StreamSocketListener _listener;
         string IP_info;
+        
         
         public MainPage()
         {
@@ -117,6 +119,8 @@ namespace doc_onlook
         {
             private List<string> workspaceList { get; set; }
             private Pivot workspacePivot { get; set; }
+            PdfDocument _pdfDocument;
+            StackPanel _pdfStack;
 
             public async void AddToList(string fileName)
             {
@@ -188,28 +192,59 @@ namespace doc_onlook
                 scrollView.ViewChanged += PdfScrollView_ViewChanged;
             }
 
-            private void PdfScrollView_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+            private ProgressRing CreateProgressRing()
             {
-                ScrollViewer pdfScrollView = (ScrollViewer)sender;
-                StackPanel pdfStackPanel = (StackPanel)pdfScrollView.Content;
+                ProgressRing progressRing = new ProgressRing();
+                progressRing.Height = 100;
+                progressRing.Width = 100;
+                progressRing.IsActive = true;
+                return progressRing;
+            }
 
-                var ttv = pdfScrollView.TransformToVisual(Window.Current.Content);
-                Point scrollViewCoords = ttv.TransformPoint(new Point(0, 0));
-                List<int> inView = new List<int>();
+            private async void PdfScrollView_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+            {
+                //if (e.IsIntermediate == false)
+                //{
+                    ScrollViewer pdfScrollView = (ScrollViewer)sender;
+                    StackPanel pdfStackPanel = (StackPanel)pdfScrollView.Content;
 
-                if ((pdfScrollView).Content != null)
-                {
-                    for (var i = 0; i < pdfStackPanel.Children.Count; i++)
+                    var ttv = pdfScrollView.TransformToVisual(Window.Current.Content);
+                    Point scrollViewCoords = ttv.TransformPoint(new Point(0, 0));
+
+                    if ((pdfScrollView).Content != null)
                     {
-                        StackPanel imageContainer = (StackPanel)pdfStackPanel.Children[i];
-                        var ttv2 = imageContainer.TransformToVisual(Window.Current.Content);
-                        Point screenCoords = ttv2.TransformPoint(new Point(0, 0));
-                        if (screenCoords.Y > scrollViewCoords.Y && screenCoords.Y < (scrollViewCoords.Y + pdfScrollView.ActualHeight))
+                        for (var i = 0; i < pdfStackPanel.Children.Count; i++)
                         {
-                            inView.Add(i);
+                            StackPanel imageContainer = (StackPanel)pdfStackPanel.Children[i];
+                            var ttv2 = imageContainer.TransformToVisual(Window.Current.Content);
+                            Point imageCoords = ttv2.TransformPoint(new Point(0, 0));
+                            var img = ((Image)(imageContainer).Children[0]);
+
+                            double imageBottom = imageCoords.Y + imageContainer.ActualHeight;
+                            double imageTop = imageCoords.Y;
+                            double scrollViewTop = scrollViewCoords.Y;
+                            double scrollViewBottom = scrollViewCoords.Y+pdfScrollView.ActualHeight;
+
+                            if(((imageBottom<scrollViewBottom && imageBottom>scrollViewTop) || (imageTop<scrollViewBottom && imageTop>scrollViewTop)) && (imageContainer.Children.Count < 2))
+                            {
+                                Debug.WriteLine("Loading " + i.ToString());
+                                imageContainer.Children.Add(CreateProgressRing());
+                                PdfPage pdfPage = _pdfDocument.GetPage((uint)i);
+                                var stream = new InMemoryRandomAccessStream();
+                                PdfPageRenderOptions options = new PdfPageRenderOptions();
+                                options.BitmapEncoderId = BitmapEncoder.JpegXREncoderId;
+                                options.DestinationHeight = (uint)(0.8*pdfPage.Dimensions.ArtBox.Height);
+                                options.DestinationWidth = (uint)(0.8*pdfPage.Dimensions.ArtBox.Width);
+                                await pdfPage.RenderToStreamAsync(stream, options);
+                                BitmapImage pdfImg = new BitmapImage();
+                                pdfImg.SetSource(stream);
+                                img.Source = pdfImg;
+                                imageContainer.Height = pdfImg.PixelHeight;
+                                imageContainer.Width = pdfImg.PixelWidth;
+                            }
                         }
                     }
-                }
+                //}
             }
 
             StackPanel CreateImageContainer(double height, double width)
@@ -304,13 +339,22 @@ namespace doc_onlook
 
             private void DOMContentLoaded(WebView webView, WebViewDOMContentLoadedEventArgs args)
             {
-                webView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50;
+                try
+                {
+                    webView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50;
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine("DOMContentLoaded " + e.ToString());
+                }
             }
+            
             
 
             private async void LoadPdf(PdfDocument pdfDocument, StackPanel stackPanel)
             {
-
+                _pdfDocument = pdfDocument;
+                _pdfStack = stackPanel;
                 PdfPage initPage = pdfDocument.GetPage(0);
                 var initStream = new InMemoryRandomAccessStream();
                 await initPage.RenderToStreamAsync(initStream);
@@ -320,25 +364,6 @@ namespace doc_onlook
                 for (uint i = 0; i < pdfDocument.PageCount; i++)
                 {
                     stackPanel.Children.Add(CreateImageContainer(initPdfImg.PixelHeight, initPdfImg.PixelWidth));
-                }
-
-                for (uint i = 0; i < pdfDocument.PageCount; i++)
-                {
-                    PdfPage page = pdfDocument.GetPage(i);
-                    var stream = new InMemoryRandomAccessStream();
-                    await page.RenderToStreamAsync(stream);
-                    BitmapImage pdfImg = new BitmapImage();
-                    pdfImg.SetSource(stream);
-                    var img = ((Image)((StackPanel)stackPanel.Children[(int)i]).Children[0]);
-                    img.Source = pdfImg;
-                    var imageContainer = (StackPanel)img.Parent;
-
-                    imageContainer.Height = pdfImg.PixelHeight;
-                    imageContainer.Width = pdfImg.PixelWidth;
-                    if (i == 0)
-                    {
-                        img.SizeChanged += PdfScrollViewImage_Loaded;
-                    }
                 }
             }
 
@@ -890,10 +915,7 @@ namespace doc_onlook
 
         private async void OpenFileBtn_Click(object sender, RoutedEventArgs e)
         {
-            PivotItem pivotItem = (PivotItem)WorkspacePivot.Items[WorkspacePivot.SelectedIndex];
-            string fileName = (string)pivotItem.Header;
-
-            StorageFile file = await GetLocalFile(fileName);
+            StorageFile file = (StorageFile)LocalListView.SelectedItem;
             await Launcher.LaunchFileAsync(file, new LauncherOptions
             {
                 DisplayApplicationPicker = true,
@@ -904,7 +926,7 @@ namespace doc_onlook
 
         }
 
-        private async void LocalListView_SelectionChanged(object sender, SelectionChangedEventArgs args)
+        private void LocalListView_SelectionChanged(object sender, SelectionChangedEventArgs args)
         {
             if (LocalListView.ItemsSource != null)
             {
