@@ -18,10 +18,10 @@
                 <RowDefinition Height="1*"></RowDefinition>
                 <RowDefinition Height="2*"></RowDefinition>
             </Grid.RowDefinitions>
-            <ListView Name="LocalListView" Margin="20" CanDragItems="True" SelectionMode="Extended" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted">
+            <ListView Name="LocalListView" Margin="20" CanDragItems="True" SelectionMode="Extended" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted" SelectionChanged="LocalListView_SelectionChanged">
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel Name="FileListItem" Tapped="FileListItem_Tapped">
+                        <StackPanel>
                             <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
                             <TextBlock Text="{Binding FileType}" FontWeight="Normal" />
                             <TextBlock Text="{Binding DateCreated}" FontWeight="Normal" />
@@ -32,12 +32,15 @@
             </ListView>
             <Button Name="LoadAll" Grid.Row="1" Tapped="LoadAll_Tapped">
                 <SymbolIcon Symbol="Refresh"/>
+                
             </Button>
             <StackPanel Name="FileReception" Background="Azure" Grid.Row="2" Margin="0,2,0,0">
-                <AutoSuggestBox Name="SuggestBox" PlaceholderText="Search your files" QueryIcon="Find" TextChanged="AutoSuggestBox_TextChanged" QuerySubmitted="AutoSuggestBox_QuerySubmitted" SuggestionChosen="AutoSuggestBox_SuggestionChosen" Margin="0,0,79,0"></AutoSuggestBox>
-                <TextBlock Name="FileReceptionIndicator" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="11,0,10,10" Width="286">File reception</TextBlock>
-                <TextBlock Name="IPInfo" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="11,0,10,10" Width="286">IPInfo</TextBlock>
+                <AutoSuggestBox Name="SuggestBox" PlaceholderText="Search your files" QueryIcon="Find" TextChanged="AutoSuggestBox_TextChanged" QuerySubmitted="AutoSuggestBox_QuerySubmitted" SuggestionChosen="AutoSuggestBox_SuggestionChosen" Margin="0,0,79,0" VerticalAlignment="Top"/>
+                <TextBlock Name="FileReceptionIndicator" HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="286">File reception</TextBlock>
+                <TextBlock Name="IPInfo" HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="286">IPInfo</TextBlock>
+                <TextBlock Name="TestOutput" HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="286">testOutput</TextBlock>
             </StackPanel>
+
         </Grid>
 
         <Grid Grid.Row="0" Grid.Column="1" Background="#FFFFBAC6">

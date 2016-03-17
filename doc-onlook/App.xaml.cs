@@ -41,8 +41,7 @@ namespace doc_onlook
             {
                 if (task.Value.Name == exampleTaskName)
                 {
-                    taskRegistered = true;
-                    Debug.WriteLine("BackgroundTask registered...");
+                    taskRegistered = true;                    
                     break;
                 }
             }
@@ -63,7 +62,6 @@ namespace doc_onlook
         {
             var storageFile = await Windows.Storage.StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///DocOnlookCommands.xml"));
             await Windows.ApplicationModel.VoiceCommands.VoiceCommandDefinitionManager.InstallCommandDefinitionsFromStorageFileAsync(storageFile);
-            Debug.WriteLine("VCD attached");
         }
 
         /// <summary>
@@ -153,7 +151,7 @@ namespace doc_onlook
 
                 switch (voiceCommandName)
                 {
-                    case "showTheLatestFile": Debug.WriteLine("Show latest file");
+                    case "showTheLatestFile": 
                         break;
                 }
         }

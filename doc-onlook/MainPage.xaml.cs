@@ -24,6 +24,8 @@ using Windows.UI.ViewManagement;
 using Newtonsoft.Json;
 using Windows.Networking.Connectivity;
 using Windows.Data.Pdf;
+using Windows.UI.Xaml.Media;
+using Windows.Foundation;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -126,6 +128,7 @@ namespace doc_onlook
                 SetPivotItemContent(workspaceList.Count - 1, file);
             }
 
+
             private PivotItem CreateWorkspaceItem(string fileName)
             {
                 PivotItem newItem = new PivotItem();
@@ -178,10 +181,47 @@ namespace doc_onlook
                 scrollView.Height = stackPanel.Height;
                 scrollView.Width = stackPanel.Width;
 
-                
                 scrollView.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
                 scrollView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 scrollView.ZoomMode = ZoomMode.Enabled;
+
+                scrollView.ViewChanged += PdfScrollView_ViewChanged;
+            }
+
+            private void PdfScrollView_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+            {
+                ScrollViewer pdfScrollView = (ScrollViewer)sender;
+                StackPanel pdfStackPanel = (StackPanel)pdfScrollView.Content;
+
+                var ttv = pdfScrollView.TransformToVisual(Window.Current.Content);
+                Point scrollViewCoords = ttv.TransformPoint(new Point(0, 0));
+                List<int> inView = new List<int>();
+
+                if ((pdfScrollView).Content != null)
+                {
+                    for (var i = 0; i < pdfStackPanel.Children.Count; i++)
+                    {
+                        StackPanel imageContainer = (StackPanel)pdfStackPanel.Children[i];
+                        var ttv2 = imageContainer.TransformToVisual(Window.Current.Content);
+                        Point screenCoords = ttv2.TransformPoint(new Point(0, 0));
+                        if (screenCoords.Y > scrollViewCoords.Y && screenCoords.Y < (scrollViewCoords.Y + pdfScrollView.ActualHeight))
+                        {
+                            inView.Add(i);
+                        }
+                    }
+                }
+            }
+
+            StackPanel CreateImageContainer(double height, double width)
+            {
+                StackPanel imageContainer = new StackPanel();
+                imageContainer.Height = height;
+                imageContainer.Width = width;
+                Border myBorder2 = new Border();
+                imageContainer.Background = new SolidColorBrush(Windows.UI.Colors.Black);
+                imageContainer.Margin = new Thickness(1);
+                imageContainer.Children.Add(new Image());
+                return imageContainer;
             }
 
             private UIElement SetContentType(StackPanel stackPanel, string type, uint count)
@@ -203,7 +243,7 @@ namespace doc_onlook
 
                         Image image = new Image();
                         image.SizeChanged += ScrollViewImage_Loaded;
-                        image.Stretch = Windows.UI.Xaml.Media.Stretch.Uniform;
+                        image.Stretch = Stretch.Uniform;
 
                         scrollView.Content = image;                        
                         stackPanel.Children.Add(scrollView);           
@@ -219,11 +259,6 @@ namespace doc_onlook
                         StackPanel pdfStackPanel = new StackPanel();
                         pdfScrollView.Content = pdfStackPanel;
                         pdfStackPanel.Width = pdfScrollView.Width;
-                        for (var i=0; i<count; i++)
-                        {
-                            Image pdfImage = new Image();
-                            pdfStackPanel.Children.Add(pdfImage);
-                        }
                         return stackPanel;
                             
                     default:
@@ -275,60 +310,85 @@ namespace doc_onlook
 
             private async void LoadPdf(PdfDocument pdfDocument, StackPanel stackPanel)
             {
-                
 
-                for (uint i=0; i<pdfDocument.PageCount; i++)
+                PdfPage initPage = pdfDocument.GetPage(0);
+                var initStream = new InMemoryRandomAccessStream();
+                await initPage.RenderToStreamAsync(initStream);
+                BitmapImage initPdfImg = new BitmapImage();
+                initPdfImg.SetSource(initStream);
+
+                for (uint i = 0; i < pdfDocument.PageCount; i++)
+                {
+                    stackPanel.Children.Add(CreateImageContainer(initPdfImg.PixelHeight, initPdfImg.PixelWidth));
+                }
+
+                for (uint i = 0; i < pdfDocument.PageCount; i++)
                 {
                     PdfPage page = pdfDocument.GetPage(i);
                     var stream = new InMemoryRandomAccessStream();
                     await page.RenderToStreamAsync(stream);
                     BitmapImage pdfImg = new BitmapImage();
                     pdfImg.SetSource(stream);
-                    Image img = ((Image)(stackPanel.Children[(int)i]));
+                    var img = ((Image)((StackPanel)stackPanel.Children[(int)i]).Children[0]);
                     img.Source = pdfImg;
+                    var imageContainer = (StackPanel)img.Parent;
+
+                    imageContainer.Height = pdfImg.PixelHeight;
+                    imageContainer.Width = pdfImg.PixelWidth;
                     if (i == 0)
                     {
                         img.SizeChanged += PdfScrollViewImage_Loaded;
                     }
                 }
-                
             }
 
             public async void SetPivotItemContent(int index, StorageFile file)
             {
-                Debug.WriteLine("SetPivotItemContent");
-                PivotItem pivotItem = (PivotItem)workspacePivot.Items[index];
-                
-                StackPanel stackPanel = (StackPanel)pivotItem.Content;
-                pivotItem.Header = file.DisplayName;
-
-                switch (file.FileType)
+                try
                 {
-                    case ".html":
-                                WebView webView = (WebView)SetContentType(stackPanel,".html",0);
-                                var buffer = await FileIO.ReadTextAsync(file);
-                                webView.NavigateToString(buffer);
-                                break;
-                    case ".jpg":
-                                Image image = (Image)SetContentType(stackPanel,".jpg",0);
-                                var fileStream = await file.OpenAsync(FileAccessMode.Read);
-                                var img = new BitmapImage();
-                                img.SetSource(fileStream);
-                                image.Source = img;
-                                break;
-                    case ".pdf":
-                                PdfDocument pdfDocument = await PdfDocument.LoadFromFileAsync(file);
-                                stackPanel = (StackPanel)SetContentType(stackPanel, ".pdf",pdfDocument.PageCount);
-                                LoadPdf(pdfDocument, ((StackPanel)(((ScrollViewer)(stackPanel.Children[0])).Content)));
-                                break;
-                    default: NotifyUser("Error: File extension not found.");
-                        break;
+                    Debug.WriteLine("SetPivotItemContent");
+                    PivotItem pivotItem = (PivotItem)workspacePivot.Items[index];
+                    
+                    StackPanel stackPanel = (StackPanel)pivotItem.Content;
+                    pivotItem.Header = file.DisplayName;
+
+                    switch (file.FileType)
+                    {
+                        case ".html":
+                            Debug.WriteLine("SetPivotItemContent .html");
+                            WebView webView = (WebView)SetContentType(stackPanel, ".html", 0);
+                            var buffer = await FileIO.ReadTextAsync(file);
+                            webView.NavigateToString(buffer);
+                            break;
+                        case ".jpg":
+                            Debug.WriteLine("SetPivotItemContent .jpg");
+                            Image image = (Image)SetContentType(stackPanel, ".jpg", 0);
+                            var fileStream = await file.OpenAsync(FileAccessMode.Read);
+                            var img = new BitmapImage();
+                            img.SetSource(fileStream);
+                            image.Source = img;
+                            break;
+                        case ".pdf":
+                            Debug.WriteLine("SetPivotItemContent .pdf");
+                            PdfDocument pdfDocument = await PdfDocument.LoadFromFileAsync(file);
+                            stackPanel = (StackPanel)SetContentType(stackPanel, ".pdf", pdfDocument.PageCount);
+                            LoadPdf(pdfDocument, ((StackPanel)(((ScrollViewer)(stackPanel.Children[0])).Content)));
+                            break;
+                        default:
+                            NotifyUser("Error: File extension not found.");
+                            break;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine(e.ToString());
                 }
                 
             }
 
             public void ShowDoc(StorageFile file)
             {
+                Debug.WriteLine("ShowDoc");
                 SetPivotItemContent(workspacePivot.SelectedIndex, file);
             }
 
@@ -347,16 +407,19 @@ namespace doc_onlook
         // Fill the local files list:
         public async void UpdateLocalList()
         {
+            Debug.WriteLine("UpdateLocalList");
             localFilesList = await GetLocalFiles();
             fileNameList.Clear();
             foreach (StorageFile file in localFilesList)
             {
-                if(fileNameList.IndexOf(file.DisplayName) == -1)
+                if (fileNameList.IndexOf(file.DisplayName) == -1)
                 {
                     fileNameList.Add(file.DisplayName);
                 }
             }
+            LocalListView.ItemsSource = null;
             LocalListView.ItemsSource = localFilesList;
+            LocalListView.SelectedIndex = 0;
         }
 
         public async void UpdateLocalList_Thread()
@@ -410,26 +473,6 @@ namespace doc_onlook
                 MessageDialog dialog = new MessageDialog("Something occured: "+exc.ToString());
                 await dialog.ShowAsync();
             }
-            
-        }
-
-        private async void FileListItem_Tapped(object sender, TappedRoutedEventArgs args)
-        {
-            try
-            {
-                StackPanel fileItem = (StackPanel)sender;
-                string fileName = ((TextBlock)fileItem.Children[0]).Text;
-                string fileType = ((TextBlock)fileItem.Children[1]).Text;
-
-                StorageFile localFile = await GetLocalFile(fileName + fileType);
-                workspace.ShowDoc(localFile);
-                
-            }
-            catch(Exception e)
-            {
-                NotifyUser("Something occured: " + e.ToString());
-            }
-            
             
         }
 
@@ -670,20 +713,20 @@ namespace doc_onlook
 
         private async void DeleteLocalFile(string name)
         {
+            Debug.WriteLine("DeleteLocalFile");
             try
             {
                 StorageFolder localFolder = ApplicationData.Current.LocalFolder;
                 StorageFile file = await localFolder.GetFileAsync(name);
                 await file.DeleteAsync();
                 fileNameList.Remove(name);
-                NotifyUser("File deleted.");
-                
                 UpdateLocalList();
             }
             catch(Exception e)
             {
-                NotifyUser("Exception: " + e.ToString());
+                Debug.WriteLine("Delete Local File: "+ e.ToString());
             }
+            
         }
 
         private void NewTabBtn_Tapped_1(object sender, TappedRoutedEventArgs e)
@@ -833,11 +876,16 @@ namespace doc_onlook
             NotifyUser(image.Height + " " + image.Width + " " + image.ActualHeight + " " + image.ActualWidth);
         }
 
-        private void DeleteBtn_Tapped(object sender, TappedRoutedEventArgs e)
+        private void DeleteBtn_Tapped(object sender, TappedRoutedEventArgs args)
         {
-            PivotItem pivotItem = (PivotItem)WorkspacePivot.Items[WorkspacePivot.SelectedIndex];
-            string fileName = (string)pivotItem.Header;
-            DeleteLocalFile(fileName);
+            Debug.WriteLine("DeleteBtn");
+            StorageFile file = (StorageFile)LocalListView.SelectedItem;
+            try{
+                DeleteLocalFile(file.DisplayName + file.FileType);
+            }catch(Exception e)
+            {
+                NotifyUser("Sorry, we couldn't delete the file: " + e.Message + ", " + e.HelpLink);
+            }
         }
 
         private async void OpenFileBtn_Click(object sender, RoutedEventArgs e)
@@ -856,14 +904,27 @@ namespace doc_onlook
 
         }
 
-        public class PdfImage
+        private async void LocalListView_SelectionChanged(object sender, SelectionChangedEventArgs args)
         {
-            public BitmapImage bmpImage;
-
-            public PdfImage(BitmapImage img)
+            if (LocalListView.ItemsSource != null)
             {
-                bmpImage = img;
+                Debug.WriteLine("SelectionChanged");
+                try
+                {
+                    var file = (StorageFile)LocalListView.SelectedItem;
+                    workspace.ShowDoc(file);
+                }
+                catch (Exception e)
+                {
+                    NotifyUser("Sorry, we couldn't open the file: " + e.Message + ", " + e.HelpLink);
+                }
             }
         }
+
+        public class PdfPageListItem
+        {
+            public BitmapImage BmImage { get; set; }
+        }
     }
+    
 }
