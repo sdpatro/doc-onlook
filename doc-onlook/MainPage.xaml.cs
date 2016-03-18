@@ -201,10 +201,31 @@ namespace doc_onlook
                 return progressRing;
             }
 
-            private async void PdfScrollView_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+            private async void LoadPdfImage(int i, StackPanel imageContainer, Image img)
             {
-                //if (e.IsIntermediate == false)
-                //{
+                if (imageContainer.Children.Count<2)
+                {
+                    Debug.WriteLine("Loading " + i.ToString());
+                    imageContainer.Children.Add(CreateProgressRing());
+                    PdfPage pdfPage = _pdfDocument.GetPage((uint)i);
+                    var stream = new InMemoryRandomAccessStream();
+                    PdfPageRenderOptions options = new PdfPageRenderOptions();
+                    options.BitmapEncoderId = BitmapEncoder.JpegXREncoderId;
+                    options.DestinationHeight = (uint)(0.8 * pdfPage.Dimensions.ArtBox.Height);
+                    options.DestinationWidth = (uint)(0.8 * pdfPage.Dimensions.ArtBox.Width);
+                    await pdfPage.RenderToStreamAsync(stream, options);
+                    BitmapImage pdfImg = new BitmapImage();
+                    pdfImg.SetSource(stream);
+                    img.Source = pdfImg;
+                    imageContainer.Height = pdfImg.PixelHeight;
+                    imageContainer.Width = pdfImg.PixelWidth; 
+                }
+            }
+
+            private void PdfScrollView_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+            {
+                if (e.IsIntermediate == false)
+                {
                     ScrollViewer pdfScrollView = (ScrollViewer)sender;
                     StackPanel pdfStackPanel = (StackPanel)pdfScrollView.Content;
 
@@ -225,26 +246,21 @@ namespace doc_onlook
                             double scrollViewTop = scrollViewCoords.Y;
                             double scrollViewBottom = scrollViewCoords.Y+pdfScrollView.ActualHeight;
 
-                            if(((imageBottom<scrollViewBottom && imageBottom>scrollViewTop) || (imageTop<scrollViewBottom && imageTop>scrollViewTop)) && (imageContainer.Children.Count < 2))
+                            if(imageTop<scrollViewBottom && imageTop>scrollViewTop)
                             {
-                                Debug.WriteLine("Loading " + i.ToString());
-                                imageContainer.Children.Add(CreateProgressRing());
-                                PdfPage pdfPage = _pdfDocument.GetPage((uint)i);
-                                var stream = new InMemoryRandomAccessStream();
-                                PdfPageRenderOptions options = new PdfPageRenderOptions();
-                                options.BitmapEncoderId = BitmapEncoder.JpegXREncoderId;
-                                options.DestinationHeight = (uint)(0.8*pdfPage.Dimensions.ArtBox.Height);
-                                options.DestinationWidth = (uint)(0.8*pdfPage.Dimensions.ArtBox.Width);
-                                await pdfPage.RenderToStreamAsync(stream, options);
-                                BitmapImage pdfImg = new BitmapImage();
-                                pdfImg.SetSource(stream);
-                                img.Source = pdfImg;
-                                imageContainer.Height = pdfImg.PixelHeight;
-                                imageContainer.Width = pdfImg.PixelWidth;
+                                LoadPdfImage(i, imageContainer, img);
+                                if (i<pdfStackPanel.Children.Count)
+                                {
+                                    LoadPdfImage(i + 1, (StackPanel)pdfStackPanel.Children[i + 1], ((Image)((StackPanel)pdfStackPanel.Children[i + 1]).Children[0]));
+                                }
+                                if (i>0)
+                                {
+                                    LoadPdfImage(i - 1, (StackPanel)pdfStackPanel.Children[i - 1], ((Image)((StackPanel)pdfStackPanel.Children[i - 1]).Children[0]));
+                                }
                             }
                         }
                     }
-                //}
+                }
             }
 
             StackPanel CreateImageContainer(double height, double width)
@@ -253,7 +269,7 @@ namespace doc_onlook
                 imageContainer.Height = height;
                 imageContainer.Width = width;
                 Border myBorder2 = new Border();
-                imageContainer.Background = new SolidColorBrush(Windows.UI.Colors.Black);
+                imageContainer.Background = new SolidColorBrush(Windows.UI.Colors.White);
                 imageContainer.Margin = new Thickness(1);
                 imageContainer.Children.Add(new Image());
                 return imageContainer;
@@ -349,21 +365,13 @@ namespace doc_onlook
                 }
             }
             
-            
-
             private async void LoadPdf(PdfDocument pdfDocument, StackPanel stackPanel)
             {
                 _pdfDocument = pdfDocument;
                 _pdfStack = stackPanel;
-                PdfPage initPage = pdfDocument.GetPage(0);
-                var initStream = new InMemoryRandomAccessStream();
-                await initPage.RenderToStreamAsync(initStream);
-                BitmapImage initPdfImg = new BitmapImage();
-                initPdfImg.SetSource(initStream);
-
                 for (uint i = 0; i < pdfDocument.PageCount; i++)
                 {
-                    stackPanel.Children.Add(CreateImageContainer(initPdfImg.PixelHeight, initPdfImg.PixelWidth));
+                    stackPanel.Children.Add(CreateImageContainer(pdfDocument.GetPage(i).Dimensions.ArtBox.Height, pdfDocument.GetPage(i).Dimensions.ArtBox.Width));
                 }
             }
 
