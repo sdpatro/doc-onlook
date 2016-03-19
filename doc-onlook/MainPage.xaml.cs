@@ -27,7 +27,8 @@ using Windows.Data.Pdf;
 using Windows.UI.Xaml.Media;
 using Windows.Foundation;
 using Windows.Graphics.Imaging;
-using CSVParserWinRT;
+using Ideafixxxer.CsvParser;
+using System.IO;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -113,6 +114,31 @@ namespace doc_onlook
             _matchingNamesList = new List<string>();
 
             InitializeIPInfo();
+        }
+
+        class Person
+        {
+            private string FirstName
+            {
+                get;
+                set;
+            }
+            private string LastName
+            {
+                get;
+                set;
+            }
+            private string Category
+            {
+                get;
+                set;
+            }
+            public Person(string FirstName, string LastName, string Category)
+            {
+                this.FirstName = FirstName;
+                this.LastName = LastName;
+                this.Category = Category;
+            }
         }
 
         class Workspace
@@ -330,8 +356,17 @@ namespace doc_onlook
                         ScrollViewer csvScrollView = new ScrollViewer();
                         SetScrollViewerProperties(csvScrollView, stackPanel, "CSV");
                         stackPanel.Children.Add(csvScrollView);
-                        TextBlock csvBlock = new TextBlock();
-                        csvScrollView.Content = csvBlock;
+                        ListView csvListView = new ListView();
+                        csvScrollView.Content = csvListView;
+                        return stackPanel;
+
+                    case ".txt":
+                        stackPanel.Children.Clear();
+                        ScrollViewer txtScrollView = new ScrollViewer();
+                        SetScrollViewerProperties(txtScrollView, stackPanel, "TXT");
+                        stackPanel.Children.Add(txtScrollView);
+                        TextBlock txtBlock = new TextBlock();
+                        txtScrollView.Content = txtBlock;
                         return stackPanel;
 
                     default:
@@ -441,7 +476,12 @@ namespace doc_onlook
                         case ".csv":
                             Debug.WriteLine("SetPivotItemContent .csv");                            
                             stackPanel = (StackPanel)SetContentType(stackPanel, ".csv", 0);
-                            LoadCsv((TextBlock)(((ScrollViewer)(stackPanel.Children[0])).Content),file);
+                            LoadCsv((ListView)(((ScrollViewer)(stackPanel.Children[0])).Content),file);
+                            break;
+                        case ".txt":
+                            Debug.WriteLine("SetPivotItemContent .txt");
+                            stackPanel = (StackPanel)SetContentType(stackPanel, ".txt", 0);
+                            LoadTxt((TextBlock)(((ScrollViewer)stackPanel.Children[0]).Content), file);
                             break;
                         default:
                             NotifyUser("Error: File extension not found.");
@@ -455,24 +495,36 @@ namespace doc_onlook
                 
             }
 
-            private async void LoadCsv(TextBlock csvBlock,StorageFile file)
+            private async void LoadTxt(TextBlock textBlock, StorageFile file)
+            {
+                string txtContent = await FileIO.ReadTextAsync(file);
+                textBlock.Text = txtContent;
+            }
+
+            private async void LoadCsv(ListView csvListView,StorageFile file)
             {
                 string csvText = await FileIO.ReadTextAsync(file);
+                TextReader reader = new StringReader(csvText);
                 CsvParser csvParser = new CsvParser();
-                string blockText = "";
-                blockText += csvText;
-                var results = await csvParser.Parse();
-                foreach(var result in results)
+                string[][] results = csvParser.Parse(reader);
+                List<string> resultsList = new List<string>();
+                foreach(string[] result in results)
                 {
-                    foreach(var key in result.Keys)
+                    string resultListItem = "";
+                    foreach(string resultColValue in result)
                     {
-                        blockText += key;
-                        blockText += "\n";
+                        resultListItem += resultColValue + "    ";
                     }
+                    resultsList.Add(resultListItem);
                 }
-                csvBlock.Text = blockText;
-
+                csvListView.ItemsSource = resultsList;               
             }
+
+            //private DataTemplate CreateDataTemplate(int count)
+            //{
+            //    DataTemplate dataTemplate = new DataTemplate();
+                
+            //}
 
             public void ShowDoc(StorageFile file)
             {
@@ -663,6 +715,8 @@ namespace doc_onlook
 
             switch (ContentData["type"])
             {
+                case ".csv":
+                case ".txt":
                 case ".html": using (IRandomAccessStream textStream = await newFile.OpenAsync(FileAccessMode.ReadWrite))
                               {
                                     using (DataWriter textWriter = new DataWriter(textStream))
@@ -682,15 +736,6 @@ namespace doc_onlook
                                         await textWriter.StoreAsync();
                                     }
                                 }
-                            break;
-                case ".csv": using (IRandomAccessStream textStream = await newFile.OpenAsync(FileAccessMode.ReadWrite))
-                            {
-                                using (DataWriter textWriter = new DataWriter(textStream))
-                                {
-                                    textWriter.WriteString(ContentData["data"]);
-                                    await textWriter.StoreAsync();
-                                }
-                            }
                             break;
 
                 default: NotifyUser_Thread("Can't write file");
@@ -963,16 +1008,19 @@ namespace doc_onlook
             
             switch (file.FileType)
             {
+                case ".txt":
                 case ".html":
                             string HTMLContent;
                             HTMLContent = await FileIO.ReadTextAsync(file);
                             string htmlFormat = HtmlFormatHelper.CreateHtmlFormat(HTMLContent);
                             request.Data.SetHtmlFormat(htmlFormat);
                             break;
+                case ".png":
                 case ".jpg":
                             RandomAccessStreamReference imageStreamRef = RandomAccessStreamReference.CreateFromFile(file);
                             request.Data.SetBitmap(imageStreamRef);
                             break;
+                case ".csv":
                 case ".pdf":
                             RandomAccessStreamReference pdfStreamRef = RandomAccessStreamReference.CreateFromFile(file);
                             List<StorageFile> storageList = new List<StorageFile>();

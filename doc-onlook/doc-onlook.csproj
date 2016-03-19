@@ -96,12 +96,9 @@
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
     <Compile Include="CsvParser.cs" />
-    <Compile Include="IParserEngine.cs" />
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="ParserEngines\BasicParserEngine.cs" />
-    <Compile Include="ParserEngines\BetterParserEngine.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -111,8 +108,6 @@
     <None Include="doc-onlook_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="CSVParserWinRT.csproj" />
-    <Content Include="CSVParserWinRT.csproj.vspscc" />
     <Content Include="DocOnlookCommands.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <SubType>Designer</SubType>

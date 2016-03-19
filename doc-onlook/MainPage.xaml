@@ -24,8 +24,6 @@
                         <StackPanel>
                             <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
                             <TextBlock Text="{Binding FileType}" FontWeight="Normal" />
-                            <TextBlock Text="{Binding DateCreated}" FontWeight="Normal" />
-                            <TextBlock Text="{Binding DateCreated}" FontWeight="Normal" />
                         </StackPanel>
                     </DataTemplate>
                 </ListView.ItemTemplate>
