@@ -27,6 +27,7 @@ using Windows.Data.Pdf;
 using Windows.UI.Xaml.Media;
 using Windows.Foundation;
 using Windows.Graphics.Imaging;
+using System.Linq;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -203,22 +204,29 @@ namespace doc_onlook
 
             private async void LoadPdfImage(int i, StackPanel imageContainer, Image img)
             {
-                if (imageContainer.Children.Count<2)
+                try
                 {
-                    Debug.WriteLine("Loading " + i.ToString());
-                    imageContainer.Children.Add(CreateProgressRing());
-                    PdfPage pdfPage = _pdfDocument.GetPage((uint)i);
-                    var stream = new InMemoryRandomAccessStream();
-                    PdfPageRenderOptions options = new PdfPageRenderOptions();
-                    options.BitmapEncoderId = BitmapEncoder.JpegXREncoderId;
-                    options.DestinationHeight = (uint)(0.8 * pdfPage.Dimensions.ArtBox.Height);
-                    options.DestinationWidth = (uint)(0.8 * pdfPage.Dimensions.ArtBox.Width);
-                    await pdfPage.RenderToStreamAsync(stream, options);
-                    BitmapImage pdfImg = new BitmapImage();
-                    pdfImg.SetSource(stream);
-                    img.Source = pdfImg;
-                    imageContainer.Height = pdfImg.PixelHeight;
-                    imageContainer.Width = pdfImg.PixelWidth; 
+                    if (imageContainer.Children.Count < 2)
+                    {
+                        Debug.WriteLine("Loading " + i.ToString());
+                        imageContainer.Children.Add(CreateProgressRing());
+                        PdfPage pdfPage = _pdfDocument.GetPage((uint)i);
+                        var stream = new InMemoryRandomAccessStream();
+                        PdfPageRenderOptions options = new PdfPageRenderOptions();
+                        options.BitmapEncoderId = BitmapEncoder.JpegXREncoderId;
+                        options.DestinationHeight = (uint)(0.8 * pdfPage.Dimensions.ArtBox.Height);
+                        options.DestinationWidth = (uint)(0.8 * pdfPage.Dimensions.ArtBox.Width);
+                        await pdfPage.RenderToStreamAsync(stream, options);
+                        BitmapImage pdfImg = new BitmapImage();
+                        pdfImg.SetSource(stream);
+                        img.Source = pdfImg;
+                        imageContainer.Height = pdfImg.PixelHeight;
+                        imageContainer.Width = pdfImg.PixelWidth;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine("LoadPdfImage: "+e.ToString());
                 }
             }
 
@@ -249,7 +257,7 @@ namespace doc_onlook
                             if(imageTop<scrollViewBottom && imageTop>scrollViewTop)
                             {
                                 LoadPdfImage(i, imageContainer, img);
-                                if (i<pdfStackPanel.Children.Count)
+                                if (i<pdfStackPanel.Children.Count-1)
                                 {
                                     LoadPdfImage(i + 1, (StackPanel)pdfStackPanel.Children[i + 1], ((Image)((StackPanel)pdfStackPanel.Children[i + 1]).Children[0]));
                                 }
@@ -349,7 +357,7 @@ namespace doc_onlook
                 {
                     pdfScrollView.ZoomToFactor((float)pdfScrollView.ViewportWidth / (float)image.ActualWidth);
                 }
-
+                NotifyUser(pdfScrollView.ActualHeight + "," + image.ActualHeight);
                 pdfScrollView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50;
             }
 
@@ -365,7 +373,7 @@ namespace doc_onlook
                 }
             }
             
-            private async void LoadPdf(PdfDocument pdfDocument, StackPanel stackPanel)
+            private void LoadPdf(PdfDocument pdfDocument, StackPanel stackPanel, ScrollViewer pdfScrollView)
             {
                 _pdfDocument = pdfDocument;
                 _pdfStack = stackPanel;
@@ -373,6 +381,15 @@ namespace doc_onlook
                 {
                     stackPanel.Children.Add(CreateImageContainer(pdfDocument.GetPage(i).Dimensions.ArtBox.Height, pdfDocument.GetPage(i).Dimensions.ArtBox.Width));
                 }
+                LoadPdfImage(0, (StackPanel)stackPanel.Children[0], (Image)((StackPanel)(stackPanel.Children[0])).Children[0]);
+                pdfScrollView.Loaded += PdfScrollView_Loaded;
+            }
+
+            private void PdfScrollView_Loaded(object sender, RoutedEventArgs e)
+            {
+                var pdfScrollView = (ScrollViewer)sender;
+                var panelWidth = ((StackPanel)pdfScrollView.Content).ActualWidth;
+                pdfScrollView.ZoomToFactor((float)pdfScrollView.ActualWidth / (float)panelWidth);
             }
 
             public async void SetPivotItemContent(int index, StorageFile file)
@@ -405,7 +422,7 @@ namespace doc_onlook
                             Debug.WriteLine("SetPivotItemContent .pdf");
                             PdfDocument pdfDocument = await PdfDocument.LoadFromFileAsync(file);
                             stackPanel = (StackPanel)SetContentType(stackPanel, ".pdf", pdfDocument.PageCount);
-                            LoadPdf(pdfDocument, ((StackPanel)(((ScrollViewer)(stackPanel.Children[0])).Content)));
+                            LoadPdf(pdfDocument, ((StackPanel)(((ScrollViewer)(stackPanel.Children[0])).Content)), (ScrollViewer)(stackPanel.Children[0]));
                             break;
                         default:
                             NotifyUser("Error: File extension not found.");
@@ -485,7 +502,7 @@ namespace doc_onlook
             {
                 FileSavePicker savePicker = new FileSavePicker();
                 savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-                StorageFile file = await GetLocalFile((string)((PivotItem)WorkspacePivot.SelectedItem).Header);
+                StorageFile file = (StorageFile)LocalListView.SelectedItem;
                 savePicker.FileTypeChoices.Add(file.DisplayType, new List<string>() { file.FileType });
                 savePicker.SuggestedFileName = file.DisplayName;
 
@@ -873,10 +890,9 @@ namespace doc_onlook
             DataRequest request = e.Request;
             DataRequestDeferral deferral = request.GetDeferral();
             
-
             var selectedItem = (PivotItem)WorkspacePivot.SelectedItem;
             string fileName = (string)selectedItem.Header;
-            StorageFile file = await GetLocalFile(fileName);
+            StorageFile file = (StorageFile)LocalListView.SelectedItem;
 
             char[] splitter = { '.' };
             string[] contents = fileName.Split(splitter);
@@ -894,6 +910,12 @@ namespace doc_onlook
                 case ".jpg":
                             RandomAccessStreamReference imageStreamRef = RandomAccessStreamReference.CreateFromFile(file);
                             request.Data.SetBitmap(imageStreamRef);
+                            break;
+                case ".pdf":
+                            RandomAccessStreamReference pdfStreamRef = RandomAccessStreamReference.CreateFromFile(file);
+                            List<StorageFile> storageList = new List<StorageFile>();
+                            storageList.Add(file);
+                            request.Data.SetStorageItems(file);
                             break;
             }
 
@@ -954,6 +976,12 @@ namespace doc_onlook
         public class PdfPageListItem
         {
             public BitmapImage BmImage { get; set; }
+        }
+
+        private void testOutput_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            var pdfScrollView = (ScrollViewer)(((StackPanel)(((PivotItem)(WorkspacePivot.SelectedItem)).Content)).Children[0]);
+            NotifyUser(pdfScrollView.ActualWidth.ToString());
         }
     }
     
