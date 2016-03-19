@@ -47,7 +47,7 @@
             <StackPanel Name="DragPanel" Canvas.ZIndex="-1" Background="#FFFF1E1E" Opacity="0"  AllowDrop="True" DragOver="WorkspacePivot_DragOver" Drop="WorkspacePivot_Drop">
                 <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,200,0,0">Drag here for new tab</TextBlock>
             </StackPanel>
-            <Pivot Name="WorkspacePivot">
+            <Pivot Name="WorkspacePivot" SelectionChanged="WorkspacePivot_SelectionChanged">
                 <Pivot.Items>
                 </Pivot.Items>
             </Pivot>

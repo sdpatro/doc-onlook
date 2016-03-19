@@ -27,7 +27,7 @@ using Windows.Data.Pdf;
 using Windows.UI.Xaml.Media;
 using Windows.Foundation;
 using Windows.Graphics.Imaging;
-using System.Linq;
+using CSVParserWinRT;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -58,9 +58,8 @@ namespace doc_onlook
         {
             UpdateLocalList();
             workspace = new Workspace(WorkspacePivot);
-            workspace.AddToList("hello.html");
-
             WorkspacePivot.Focus(FocusState.Pointer);
+            
         }
 
         private void InitializeIPInfo()
@@ -125,6 +124,7 @@ namespace doc_onlook
 
             public async void AddToList(string fileName)
             {
+                Debug.WriteLine("AddToList: "+fileName);
                 workspaceList.Add(fileName);
                 PivotItem item = CreateWorkspaceItem(fileName);
                 workspacePivot.Items.Add(item);
@@ -138,7 +138,7 @@ namespace doc_onlook
             {
                 PivotItem newItem = new PivotItem();
                 newItem.Height = workspacePivot.Height;
-                newItem.Header = fileName;
+                newItem.Header = (fileName.Split('.'))[0];
 
                 newItem.Content = new StackPanel();
                 StackPanel stackPanel = (StackPanel)newItem.Content;
@@ -181,7 +181,7 @@ namespace doc_onlook
                 await dialog.ShowAsync();
             }
 
-            private void SetScrollViewerProperties(ScrollViewer scrollView, StackPanel stackPanel)
+            private void SetScrollViewerProperties(ScrollViewer scrollView, StackPanel stackPanel, string type)
             {
                 scrollView.Height = stackPanel.Height;
                 scrollView.Width = stackPanel.Width;
@@ -190,7 +190,12 @@ namespace doc_onlook
                 scrollView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 scrollView.ZoomMode = ZoomMode.Enabled;
 
-                scrollView.ViewChanged += PdfScrollView_ViewChanged;
+                switch(type)
+                {
+                    case "PDF": scrollView.ViewChanged += PdfScrollView_ViewChanged;
+                        break;
+                }
+                
             }
 
             private ProgressRing CreateProgressRing()
@@ -298,7 +303,7 @@ namespace doc_onlook
                     case ".jpg":
                         stackPanel.Children.Clear();
                         ScrollViewer scrollView = new ScrollViewer();
-                        SetScrollViewerProperties(scrollView, stackPanel);
+                        SetScrollViewerProperties(scrollView, stackPanel,"JPEG");
 
                         Image image = new Image();
                         image.SizeChanged += ScrollViewImage_Loaded;
@@ -313,13 +318,22 @@ namespace doc_onlook
                         ScrollViewer pdfScrollView = new ScrollViewer();
                         pdfScrollView.Width = stackPanel.Width;
 
-                        SetScrollViewerProperties(pdfScrollView, stackPanel);
+                        SetScrollViewerProperties(pdfScrollView, stackPanel,"PDF");
                         stackPanel.Children.Add(pdfScrollView);
                         StackPanel pdfStackPanel = new StackPanel();
                         pdfScrollView.Content = pdfStackPanel;
                         pdfStackPanel.Width = pdfScrollView.Width;
                         return stackPanel;
-                            
+
+                    case ".csv":
+                        stackPanel.Children.Clear();
+                        ScrollViewer csvScrollView = new ScrollViewer();
+                        SetScrollViewerProperties(csvScrollView, stackPanel, "CSV");
+                        stackPanel.Children.Add(csvScrollView);
+                        TextBlock csvBlock = new TextBlock();
+                        csvScrollView.Content = csvBlock;
+                        return stackPanel;
+
                     default:
                         return null;
                 }
@@ -400,7 +414,7 @@ namespace doc_onlook
                     PivotItem pivotItem = (PivotItem)workspacePivot.Items[index];
                     
                     StackPanel stackPanel = (StackPanel)pivotItem.Content;
-                    pivotItem.Header = file.DisplayName;
+                    pivotItem.Header = file.DisplayName.Split('.')[0];
 
                     switch (file.FileType)
                     {
@@ -424,6 +438,11 @@ namespace doc_onlook
                             stackPanel = (StackPanel)SetContentType(stackPanel, ".pdf", pdfDocument.PageCount);
                             LoadPdf(pdfDocument, ((StackPanel)(((ScrollViewer)(stackPanel.Children[0])).Content)), (ScrollViewer)(stackPanel.Children[0]));
                             break;
+                        case ".csv":
+                            Debug.WriteLine("SetPivotItemContent .csv");                            
+                            stackPanel = (StackPanel)SetContentType(stackPanel, ".csv", 0);
+                            LoadCsv((TextBlock)(((ScrollViewer)(stackPanel.Children[0])).Content),file);
+                            break;
                         default:
                             NotifyUser("Error: File extension not found.");
                             break;
@@ -436,10 +455,35 @@ namespace doc_onlook
                 
             }
 
+            private async void LoadCsv(TextBlock csvBlock,StorageFile file)
+            {
+                string csvText = await FileIO.ReadTextAsync(file);
+                CsvParser csvParser = new CsvParser();
+                string blockText = "";
+                blockText += csvText;
+                var results = await csvParser.Parse();
+                foreach(var result in results)
+                {
+                    foreach(var key in result.Keys)
+                    {
+                        blockText += key;
+                        blockText += "\n";
+                    }
+                }
+                csvBlock.Text = blockText;
+
+            }
+
             public void ShowDoc(StorageFile file)
             {
                 Debug.WriteLine("ShowDoc");
                 SetPivotItemContent(workspacePivot.SelectedIndex, file);
+            }
+
+            public string GetCurrentDoc()
+            {
+                Debug.WriteLine("GetCurrentDoc");
+                return ((PivotItem)(workspacePivot.SelectedItem)).Header.ToString();
             }
 
             public Workspace(Pivot workspacePivot)
@@ -477,8 +521,19 @@ namespace doc_onlook
             await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
             async () =>
             {
-                List<StorageFile> items = await GetLocalFiles();
-                LocalListView.ItemsSource = items;
+                Debug.WriteLine("UpdateLocalList_Thread");
+                localFilesList = await GetLocalFiles();
+                fileNameList.Clear();
+                foreach (StorageFile file in localFilesList)
+                {
+                    if (fileNameList.IndexOf(file.DisplayName) == -1)
+                    {
+                        fileNameList.Add(file.DisplayName);
+                    }
+                }
+                LocalListView.ItemsSource = null;
+                LocalListView.ItemsSource = localFilesList;
+                LocalListView.SelectedIndex = 0;
             });
         }
         
@@ -628,7 +683,17 @@ namespace doc_onlook
                                     }
                                 }
                             break;
-                default: NotifyUser("Can't write file");
+                case ".csv": using (IRandomAccessStream textStream = await newFile.OpenAsync(FileAccessMode.ReadWrite))
+                            {
+                                using (DataWriter textWriter = new DataWriter(textStream))
+                                {
+                                    textWriter.WriteString(ContentData["data"]);
+                                    await textWriter.StoreAsync();
+                                }
+                            }
+                            break;
+
+                default: NotifyUser_Thread("Can't write file");
                     break;
             }
 
@@ -890,13 +955,10 @@ namespace doc_onlook
             DataRequest request = e.Request;
             DataRequestDeferral deferral = request.GetDeferral();
             
-            var selectedItem = (PivotItem)WorkspacePivot.SelectedItem;
-            string fileName = (string)selectedItem.Header;
             StorageFile file = (StorageFile)LocalListView.SelectedItem;
 
             char[] splitter = { '.' };
-            string[] contents = fileName.Split(splitter);
-            request.Data.Properties.Title = contents[0];
+            request.Data.Properties.Title = file.DisplayName;
             request.Data.Properties.Description = "Share the current file via DocOnlook.";
             
             switch (file.FileType)
@@ -915,11 +977,10 @@ namespace doc_onlook
                             RandomAccessStreamReference pdfStreamRef = RandomAccessStreamReference.CreateFromFile(file);
                             List<StorageFile> storageList = new List<StorageFile>();
                             storageList.Add(file);
-                            request.Data.SetStorageItems(file);
+                            request.Data.SetStorageItems(storageList);
                             break;
             }
 
-            
             deferral.Complete();
         }
 
@@ -964,7 +1025,14 @@ namespace doc_onlook
                 try
                 {
                     var file = (StorageFile)LocalListView.SelectedItem;
-                    workspace.ShowDoc(file);
+                    if (workspace.GetPivotItemCount() == 0)
+                    {
+                        workspace.AddToList(file.DisplayName+file.FileType);
+                    }
+                    else if (workspace.GetCurrentDoc() != file.DisplayName)
+                    {
+                        workspace.ShowDoc(file);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -982,6 +1050,18 @@ namespace doc_onlook
         {
             var pdfScrollView = (ScrollViewer)(((StackPanel)(((PivotItem)(WorkspacePivot.SelectedItem)).Content)).Children[0]);
             NotifyUser(pdfScrollView.ActualWidth.ToString());
+        }
+
+        private void WorkspacePivot_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            string fileName = (((PivotItem)WorkspacePivot.SelectedItem).Header).ToString();
+            foreach(StorageFile fileItem in LocalListView.Items)
+            {
+                if(fileItem.DisplayName == fileName)
+                {
+                    LocalListView.SelectedIndex = LocalListView.Items.IndexOf(fileItem);
+                }
+            }
         }
     }
     
