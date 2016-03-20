@@ -62,11 +62,6 @@
                         <FontIcon Glyph="&#xE72D;"/>
                     </AppBarButton.Icon>
                 </AppBarButton>
-                <AppBarButton x:Name="SaveToCloudBtn" Label="Save to Cloud" VerticalAlignment="Top" Click="SaveToDeviceBtn_Click">
-                    <AppBarButton.Icon>
-                        <FontIcon Glyph="&#xE753;"/>
-                    </AppBarButton.Icon>
-                </AppBarButton>
                 <AppBarButton x:Name="SaveToDeviceBtn" Label="Save to Device" VerticalAlignment="Top" Icon="SaveLocal" Click="SaveToDeviceBtn_Click"/>
                 <AppBarButton x:Name="DeleteBtn" Label="Delete" Icon="Delete" VerticalAlignment="Top" Tapped="DeleteBtn_Tapped" Margin="0,0,50,0"/>
                 <AppBarButton x:Name="NewTabBtn" Label="New Tab" VerticalAlignment="Top" Icon="Add" Tapped="NewTabBtn_Tapped_1"/>

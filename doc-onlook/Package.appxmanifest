@@ -25,6 +25,12 @@
         </uap:InitialRotationPreference>
       </uap:VisualElements>
       <Extensions>
+        <Extension Category="windows.backgroundTasks" EntryPoint="BackgroundListener.SampleBackgroundTask">
+          <BackgroundTasks>
+            <Task Type="systemEvent" />
+            <Task Type="pushNotification" />
+          </BackgroundTasks>
+        </Extension>
         <uap:Extension Category="windows.personalAssistantLaunch" />
       </Extensions>
     </Application>
