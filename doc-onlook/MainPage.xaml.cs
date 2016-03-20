@@ -45,8 +45,10 @@ namespace doc_onlook
         List<string> fileNameList;
         StreamSocketListener _listener;
         string IP_info;
-        
-        
+        int _preSelectedIndex;
+        StorageFile _preSelectedItem;
+
+
         public MainPage()
         {
             InitializeComponent();
@@ -156,15 +158,19 @@ namespace doc_onlook
                 workspacePivot.Items.Add(item);
 
                 StorageFile file = await ApplicationData.Current.LocalFolder.GetFileAsync(fileName);
-                SetPivotItemContent(workspaceList.Count - 1, file);
+                SetPivotItemContent(workspacePivot.Items.Count-1, file);
             }
 
+            public int InList(string name)
+            {
+                return workspaceList.IndexOf(name);
+            }
 
             private PivotItem CreateWorkspaceItem(string fileName)
             {
                 PivotItem newItem = new PivotItem();
                 newItem.Height = workspacePivot.Height;
-                newItem.Header = (fileName.Split('.'))[0];
+                newItem.Header = CreatePivotItemHeader(fileName.Split('.')[0], fileName.Split('.')[1]);
 
                 newItem.Content = new StackPanel();
                 StackPanel stackPanel = (StackPanel)newItem.Content;
@@ -174,9 +180,47 @@ namespace doc_onlook
                 return newItem;
             }
 
-            public void RemoveFromList(string fileName)
+            private StackPanel CreatePivotItemHeader(string fileDisplayName, string fileType)
             {
-                workspaceList.Remove(fileName);
+                StackPanel headerStack = new StackPanel();
+                headerStack.Orientation = Orientation.Horizontal;
+                TextBlock displayBlock = new TextBlock();
+                displayBlock.Text = fileDisplayName;
+                TextBlock typeBlock = new TextBlock();
+                typeBlock.Text = fileType;
+                typeBlock.FontSize = 12;
+                headerStack.Children.Add(displayBlock);
+                headerStack.Children.Add(typeBlock);
+                return headerStack;
+            }
+
+            public void DeleteFromList(string s)
+            {
+                Debug.WriteLine("DeleteFromList");
+                List<int> itemIndex = new List<int>();
+                foreach(PivotItem item in workspacePivot.Items)
+                {
+                    if(GetPivotFileName(item) == s)
+                    {
+                        workspaceList.Remove(s);
+                        workspacePivot.Items.Remove(item);
+                    }
+                }
+            }
+
+
+            private string GetPivotFileName(PivotItem pivotItem)
+            {
+                Debug.WriteLine("GetPivotFileName");
+                string fileName = null;
+                if(pivotItem != null)
+                {
+                    StackPanel stackHeader = (StackPanel)pivotItem.Header;
+                    string fileDisplayName = ((TextBlock)stackHeader.Children[0]).Text;
+                    string fileType = ((TextBlock)stackHeader.Children[1]).Text;
+                    fileName = fileDisplayName + fileType;
+                }
+                return fileName;
             }
             
             public void RemoveCurrent()
@@ -198,7 +242,7 @@ namespace doc_onlook
 
             public int GetPivotItemCount()
             {
-                return workspaceList.Count;
+                return workspacePivot.Items.Count;
             }
 
             private async void NotifyUser(string message)
@@ -449,7 +493,7 @@ namespace doc_onlook
                     PivotItem pivotItem = (PivotItem)workspacePivot.Items[index];
                     
                     StackPanel stackPanel = (StackPanel)pivotItem.Content;
-                    pivotItem.Header = file.DisplayName.Split('.')[0];
+                    pivotItem.Header = CreatePivotItemHeader(file.DisplayName.Split('.')[0],file.FileType);
 
                     switch (file.FileType)
                     {
@@ -535,7 +579,10 @@ namespace doc_onlook
             public string GetCurrentDoc()
             {
                 Debug.WriteLine("GetCurrentDoc");
-                return ((PivotItem)(workspacePivot.SelectedItem)).Header.ToString();
+                StackPanel header = (StackPanel)(((PivotItem)(workspacePivot.SelectedItem)).Header);
+                string fileDisplayName = ((TextBlock)(header.Children[0])).Text;
+                string fileType = ((TextBlock)(header.Children[1])).Text;
+                return fileDisplayName + fileType;
             }
 
             public Workspace(Pivot workspacePivot)
@@ -553,39 +600,45 @@ namespace doc_onlook
         // Fill the local files list:
         public async void UpdateLocalList()
         {
+            var preSelectedFile = (StorageFile)(LocalListView.SelectedItem);
+            string preSelectedFileName = "";
+            if (preSelectedFile != null)
+            {
+                preSelectedFileName = preSelectedFile.DisplayName + preSelectedFile.FileType;
+            }
+
             Debug.WriteLine("UpdateLocalList");
             localFilesList = await GetLocalFiles();
             fileNameList.Clear();
+
+            var i = 0;
+            var nextSelectedIndex = 0;
+
             foreach (StorageFile file in localFilesList)
             {
                 if (fileNameList.IndexOf(file.DisplayName) == -1)
                 {
                     fileNameList.Add(file.DisplayName);
                 }
+                if((file.DisplayName + file.FileType)==preSelectedFileName)
+                {
+                    nextSelectedIndex = i;
+                }
+                i++;
             }
+
             LocalListView.ItemsSource = null;
             LocalListView.ItemsSource = localFilesList;
-            LocalListView.SelectedIndex = 0;
+            LocalListView.SelectedIndex = nextSelectedIndex;
+            
         }
 
         public async void UpdateLocalList_Thread()
         {
             await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
-            async () =>
+            () =>
             {
-                Debug.WriteLine("UpdateLocalList_Thread");
-                localFilesList = await GetLocalFiles();
-                fileNameList.Clear();
-                foreach (StorageFile file in localFilesList)
-                {
-                    if (fileNameList.IndexOf(file.DisplayName) == -1)
-                    {
-                        fileNameList.Add(file.DisplayName);
-                    }
-                }
-                LocalListView.ItemsSource = null;
-                LocalListView.ItemsSource = localFilesList;
-                LocalListView.SelectedIndex = 0;
+                UpdateLocalList();
             });
         }
         
@@ -871,27 +924,26 @@ namespace doc_onlook
             }
         }
 
-        private async void DeleteLocalFile(string name)
-        {
-            Debug.WriteLine("DeleteLocalFile");
-            try
-            {
-                StorageFolder localFolder = ApplicationData.Current.LocalFolder;
-                StorageFile file = await localFolder.GetFileAsync(name);
-                await file.DeleteAsync();
-                fileNameList.Remove(name);
-                UpdateLocalList();
-            }
-            catch(Exception e)
-            {
-                Debug.WriteLine("Delete Local File: "+ e.ToString());
-            }
-            
-        }
-
         private void NewTabBtn_Tapped_1(object sender, TappedRoutedEventArgs e)
         {
-            workspace.AddToList("hello.html");
+            if(LocalListView.SelectionMode == ListViewSelectionMode.Single)
+            {
+                workspace.AddToList("hello.html");
+            }
+            else
+            {
+                foreach (StorageFile file in LocalListView.SelectedItems)
+                {
+                    string fileName = file.DisplayName + file.FileType;
+                    if (workspace.InList(fileName) == -1)
+                    {
+                        workspace.AddToList(fileName);
+                    }
+                }
+
+                LocalListView.SelectionMode = ListViewSelectionMode.Single;
+                LocalListView.SelectedIndex = _preSelectedIndex;
+            }
         }
 
         private void CloseTabBtn_Tapped(object sender, TappedRoutedEventArgs e)
@@ -999,36 +1051,48 @@ namespace doc_onlook
         {
             DataRequest request = e.Request;
             DataRequestDeferral deferral = request.GetDeferral();
-            
-            StorageFile file = (StorageFile)LocalListView.SelectedItem;
 
-            char[] splitter = { '.' };
-            request.Data.Properties.Title = file.DisplayName;
-            request.Data.Properties.Description = "Share the current file via DocOnlook.";
-            
-            switch (file.FileType)
+            if(LocalListView.SelectionMode == ListViewSelectionMode.Single)
             {
-                case ".txt":
-                case ".html":
-                            string HTMLContent;
-                            HTMLContent = await FileIO.ReadTextAsync(file);
-                            string htmlFormat = HtmlFormatHelper.CreateHtmlFormat(HTMLContent);
-                            request.Data.SetHtmlFormat(htmlFormat);
-                            break;
-                case ".png":
-                case ".jpg":
-                            RandomAccessStreamReference imageStreamRef = RandomAccessStreamReference.CreateFromFile(file);
-                            request.Data.SetBitmap(imageStreamRef);
-                            break;
-                case ".csv":
-                case ".pdf":
-                            RandomAccessStreamReference pdfStreamRef = RandomAccessStreamReference.CreateFromFile(file);
-                            List<StorageFile> storageList = new List<StorageFile>();
-                            storageList.Add(file);
-                            request.Data.SetStorageItems(storageList);
-                            break;
-            }
 
+                StorageFile file = (StorageFile)LocalListView.SelectedItem;
+                request.Data.Properties.Title = file.DisplayName;
+                request.Data.Properties.Description = "Share the current file via DocOnlook.";
+
+                switch (file.FileType)
+                {
+                    case ".txt":
+                    case ".html":
+                        string HTMLContent;
+                        HTMLContent = await FileIO.ReadTextAsync(file);
+                        string htmlFormat = HtmlFormatHelper.CreateHtmlFormat(HTMLContent);
+                        request.Data.SetHtmlFormat(htmlFormat);
+                        break;
+                    case ".png":
+                    case ".jpg":
+                        RandomAccessStreamReference imageStreamRef = RandomAccessStreamReference.CreateFromFile(file);
+                        request.Data.SetBitmap(imageStreamRef);
+                        break;
+                    case ".csv":
+                    case ".pdf":
+                        List<StorageFile> storageList = new List<StorageFile>();
+                        storageList.Add(file);
+                        request.Data.SetStorageItems(storageList);
+                        break;
+                }
+            }
+            else
+            {
+                List<StorageFile> fileList = new List<StorageFile>();
+                foreach(StorageFile file in LocalListView.SelectedItems)
+                {
+                    fileList.Add(file);
+                    request.Data.Properties.Title += file.DisplayName + "; ";
+                }
+                request.Data.Properties.Description = "Share files via DocOnlook.";
+                request.Data.SetStorageItems(fileList);
+            }
+           
             deferral.Complete();
         }
 
@@ -1040,36 +1104,68 @@ namespace doc_onlook
             NotifyUser(image.Height + " " + image.Width + " " + image.ActualHeight + " " + image.ActualWidth);
         }
 
-        private void DeleteBtn_Tapped(object sender, TappedRoutedEventArgs args)
+        private async void DeleteBtn_Tapped(object sender, TappedRoutedEventArgs args)
         {
             Debug.WriteLine("DeleteBtn");
-            StorageFile file = (StorageFile)LocalListView.SelectedItem;
-            try{
-                DeleteLocalFile(file.DisplayName + file.FileType);
-            }catch(Exception e)
+            if (LocalListView.SelectionMode == ListViewSelectionMode.Single)
             {
-                NotifyUser("Sorry, we couldn't delete the file: " + e.Message + ", " + e.HelpLink);
+                StorageFile file = (StorageFile)LocalListView.SelectedItem;
+                try
+                {
+                    await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
+                    workspace.DeleteFromList(file.DisplayName + file.FileType);
+                }
+                catch (Exception e)
+                {
+                    NotifyUser("Sorry, we couldn't delete the file: " + e.Message + ", " + e.HelpLink);
+                    return;
+                }
+                NotifyUser("File deleted successfully.");
+                UpdateLocalList();
+            }
+            else
+            {
+                int count = LocalListView.SelectedItems.Count;
+                try
+                {
+                    List<string> deleteFileNames = new List<string>();
+                    foreach (StorageFile file in LocalListView.SelectedItems)
+                    {
+                        await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
+                        workspace.DeleteFromList(file.DisplayName + file.FileType);
+                    }
+                }
+                catch (Exception e)
+                {
+                    NotifyUser("Sorry, we couldn't delete the files: " + e.Message + ", " + e.HelpLink);
+                    return;
+                }
+                NotifyUser(count + " file(s) deleted successfully.");
+                LocalListView.SelectionMode = ListViewSelectionMode.Single;
+                UpdateLocalList();
             }
         }
 
         private async void OpenFileBtn_Click(object sender, RoutedEventArgs e)
         {
+            ApplicationView.GetForCurrentView().TryResizeView(new Size(640,780));
+
             StorageFile file = (StorageFile)LocalListView.SelectedItem;
             await Launcher.LaunchFileAsync(file, new LauncherOptions
             {
                 DisplayApplicationPicker = true,
                 DesiredRemainingView = ViewSizePreference.UseHalf
             });
-
+            LauncherOptions options = new LauncherOptions();
             return;
 
         }
 
         private void LocalListView_SelectionChanged(object sender, SelectionChangedEventArgs args)
         {
-            if (LocalListView.ItemsSource != null)
+            Debug.WriteLine("SelectionChanged");
+            if (LocalListView.ItemsSource!=null && LocalListView.SelectionMode!=ListViewSelectionMode.Multiple && LocalListView.SelectedIndex!=-1)
             {
-                Debug.WriteLine("SelectionChanged");
                 try
                 {
                     var file = (StorageFile)LocalListView.SelectedItem;
@@ -1077,8 +1173,9 @@ namespace doc_onlook
                     {
                         workspace.AddToList(file.DisplayName+file.FileType);
                     }
-                    else if (workspace.GetCurrentDoc() != file.DisplayName)
+                    else if (workspace.GetCurrentDoc() != (file.DisplayName + file.FileType))
                     {
+                        Debug.WriteLine("GetCurrentDoc: " + workspace.GetCurrentDoc());
                         workspace.ShowDoc(file);
                     }
                 }
@@ -1102,13 +1199,35 @@ namespace doc_onlook
 
         private void WorkspacePivot_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            string fileName = (((PivotItem)WorkspacePivot.SelectedItem).Header).ToString();
-            foreach(StorageFile fileItem in LocalListView.Items)
+            Debug.WriteLine("Pivot_SelectionChanged");
+            if (WorkspacePivot.Items.Count > 0)
             {
-                if(fileItem.DisplayName == fileName)
+                var header = (StackPanel)(((PivotItem)WorkspacePivot.SelectedItem).Header);
+                var fileDisplayName = ((TextBlock)header.Children[0]).Text;
+                var fileType = ((TextBlock)header.Children[1]).Text;
+                string fileName = fileDisplayName + fileType;
+                foreach (StorageFile fileItem in LocalListView.Items)
                 {
-                    LocalListView.SelectedIndex = LocalListView.Items.IndexOf(fileItem);
+                    if (fileItem.DisplayName + fileItem.FileType == fileName)
+                    {
+                        LocalListView.SelectedIndex = LocalListView.Items.IndexOf(fileItem);
+                    }
                 }
+            }
+        }
+
+        private void MultiSelect_Click(object sender, RoutedEventArgs e)
+        {
+            if (LocalListView.SelectionMode == ListViewSelectionMode.Single)
+            {
+                _preSelectedIndex = LocalListView.SelectedIndex;
+                LocalListView.SelectionMode = ListViewSelectionMode.Multiple;
+                LocalListView.SelectedIndex = _preSelectedIndex;
+            }
+            else
+            {
+                LocalListView.SelectionMode = ListViewSelectionMode.Single;
+                LocalListView.SelectedIndex = _preSelectedIndex;
             }
         }
     }

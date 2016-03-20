@@ -18,7 +18,7 @@
                 <RowDefinition Height="1*"></RowDefinition>
                 <RowDefinition Height="2*"></RowDefinition>
             </Grid.RowDefinitions>
-            <ListView Name="LocalListView" Margin="20" CanDragItems="True" SelectionMode="Extended" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted" SelectionChanged="LocalListView_SelectionChanged">
+            <ListView Name="LocalListView" Margin="20" CanDragItems="True" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted" SelectionChanged="LocalListView_SelectionChanged" SelectionMode="Single">
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <StackPanel>
@@ -36,7 +36,13 @@
                 <AutoSuggestBox Name="SuggestBox" PlaceholderText="Search your files" QueryIcon="Find" TextChanged="AutoSuggestBox_TextChanged" QuerySubmitted="AutoSuggestBox_QuerySubmitted" SuggestionChosen="AutoSuggestBox_SuggestionChosen" Margin="0,0,79,0" VerticalAlignment="Top"/>
                 <TextBlock Name="FileReceptionIndicator" HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="286">File reception</TextBlock>
                 <TextBlock Name="IPInfo" HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="286">IPInfo</TextBlock>
-                <TextBlock Name="TestOutput" HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="286" Tapped="testOutput_Tapped">testOutput</TextBlock>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Name="TestOutput" HorizontalAlignment="Center" VerticalAlignment="Top" Width="253" Tapped="testOutput_Tapped">testOutput</TextBlock>
+                    <Button Name="MultiSelect" Click="MultiSelect_Click">
+                        <SymbolIcon Symbol="ShowResults" />
+                    </Button>
+                </StackPanel>
+                
             </StackPanel>
 
         </Grid>
