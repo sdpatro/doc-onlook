@@ -726,11 +726,9 @@ namespace doc_onlook
                         var i = 1;
                         foreach (StorageFile file in LocalListView.SelectedItems)
                         {
-                            TestOutput.Text = "Saving file " + i + " of " + LocalListView.SelectedItems.Count;
                             await file.CopyAsync(folder);
                             i++;
                         }
-                        TestOutput.Text = "Files saved";
                         NotifyUser("All files saved successfully.");
                     }
                     catch (Exception e)
@@ -1290,6 +1288,26 @@ namespace doc_onlook
                 LocalListView.SelectedIndex = _preSelectedIndex;
             }
         }
+
+        private void Collapse_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void FileCommandBar_Opening(object sender, object e)
+        {
+            CommandBar bar = (CommandBar)sender;
+            AppBarToggleButton collapseBtn = (AppBarToggleButton)bar.Content;
+            collapseBtn.Label = "Toggle files";
+        }
+
+        private void FileCommandBar_Closed(object sender, object e)
+        {
+            CommandBar bar = (CommandBar)sender;
+            AppBarToggleButton collapseBtn = (AppBarToggleButton)bar.Content;
+            collapseBtn.Label = "";
+        }
+
     }
     
 }
