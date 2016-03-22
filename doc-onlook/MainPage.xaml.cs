@@ -5,8 +5,8 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Input;
 using System.Diagnostics;
 using Windows.Storage;
-using Windows.UI.Popups;
 using Windows.Storage.Pickers;
+using Windows.UI.Popups;
 using Windows.Storage.Search;
 using System.Threading.Tasks;
 using Windows.Networking.Sockets;
@@ -42,6 +42,7 @@ namespace doc_onlook
         Workspace workspace;
         List<StorageFile> localFilesList;
         List<StorageFile> localFilesList_queried;
+        List<FileItem> fileItemList;
         List<string> _matchingNamesList;
         List<string> fileNameList;
         StreamSocketListener _listener;
@@ -107,6 +108,7 @@ namespace doc_onlook
         {
             localFilesList = new List<StorageFile>();
             localFilesList_queried = new List<StorageFile>();
+            fileItemList = new List<FileItem>();
 
             IDictionary<string, string> dict = new Dictionary<string, string>();
             dict.Add("name", "hello");
@@ -132,29 +134,45 @@ namespace doc_onlook
             IBackgroundTaskRegistration task = builder.Register();
             return true;
         }
+        
 
-        class Person
+        class FileItem
         {
-            private string FirstName
+            public StorageFile file
             {
-                get;
-                set;
+                get; set;
             }
-            private string LastName
+            public string dateCreated
             {
-                get;
-                set;
+                get; set;
             }
-            private string Category
+            public string fileDisplayName
             {
-                get;
-                set;
+                get; set;
             }
-            public Person(string FirstName, string LastName, string Category)
+            public string fileType
             {
-                this.FirstName = FirstName;
-                this.LastName = LastName;
-                this.Category = Category;
+                get; set;
+            }
+
+            public FileItem(StorageFile file)
+            {
+                this.file = file;
+                dateCreated = file.DateCreated.LocalDateTime.ToString();
+                fileDisplayName = file.DisplayName;
+                fileType = file.FileType;
+            }
+            public static implicit operator FileItem(StorageFile s)
+            {
+                return new FileItem(s);
+            }
+            public static explicit operator StorageFile(FileItem f)
+            {
+                if (f == null)
+                {
+                    return null;
+                }
+                return f.file;
             }
         }
 
@@ -618,11 +636,11 @@ namespace doc_onlook
         };
 
 
-
         // Fill the local files list:
         public async void UpdateLocalList()
         {
-            var preSelectedFile = (StorageFile)(LocalListView.SelectedItem);
+
+            var preSelectedFile = (StorageFile)((FileItem)(LocalListView.SelectedItem));
             string preSelectedFileName = "";
             if (preSelectedFile != null)
             {
@@ -642,17 +660,23 @@ namespace doc_onlook
                 {
                     fileNameList.Add(file.DisplayName);
                 }
-                if((file.DisplayName + file.FileType)==preSelectedFileName)
+                if ((file.DisplayName + file.FileType) == preSelectedFileName)
                 {
                     nextSelectedIndex = i;
                 }
                 i++;
             }
 
+
             LocalListView.ItemsSource = null;
-            LocalListView.ItemsSource = localFilesList;
+            fileItemList.Clear();
+            foreach(StorageFile item in localFilesList)
+            {
+                fileItemList.Add(new FileItem(item));
+            }
+            LocalListView.ItemsSource = fileItemList;
             LocalListView.SelectedIndex = nextSelectedIndex;
-            
+
         }
 
         public async void UpdateLocalList_Thread()
@@ -687,7 +711,7 @@ namespace doc_onlook
                 {
                     FileSavePicker savePicker = new FileSavePicker();
                     savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-                    StorageFile file = (StorageFile)LocalListView.SelectedItem;
+                    StorageFile file = (StorageFile)((FileItem)(LocalListView.SelectedItem));
                     savePicker.FileTypeChoices.Add(file.DisplayType, new List<string>() { file.FileType });
                     savePicker.SuggestedFileName = file.DisplayName;
 
@@ -724,9 +748,10 @@ namespace doc_onlook
                         folderPicker.SettingsIdentifier = "FolderPicker";
                         var folder = await folderPicker.PickSingleFolderAsync();
                         var i = 1;
-                        foreach (StorageFile file in LocalListView.SelectedItems)
+                        foreach (FileItem file in LocalListView.SelectedItems)
                         {
-                            await file.CopyAsync(folder);
+                            StorageFile storageItem = (StorageFile)file;
+                            await storageItem.CopyAsync(folder);
                             i++;
                         }
                         NotifyUser("All files saved successfully.");
@@ -984,12 +1009,13 @@ namespace doc_onlook
         {
             if(LocalListView.SelectionMode == ListViewSelectionMode.Single)
             {
-                workspace.AddToList((StorageFile)LocalListView.SelectedItem);
+                workspace.AddToList((StorageFile)((FileItem)(LocalListView.SelectedItem)));
             }
             else
             {
-                foreach (StorageFile file in LocalListView.SelectedItems)
+                foreach (FileItem fileItem in LocalListView.SelectedItems)
                 {
+                    StorageFile file = (StorageFile)fileItem;
                     string fileName = file.DisplayName + file.FileType;
                     if (workspace.InList(fileName) == -1)
                     {
@@ -1113,7 +1139,7 @@ namespace doc_onlook
             if(LocalListView.SelectionMode == ListViewSelectionMode.Single)
             {
 
-                StorageFile file = (StorageFile)LocalListView.SelectedItem;
+                StorageFile file = (StorageFile)((FileItem)(LocalListView.SelectedItem));
                 request.Data.Properties.Title = file.DisplayName;
                 request.Data.Properties.Description = "Share the current file via DocOnlook.";
 
@@ -1142,8 +1168,9 @@ namespace doc_onlook
             else
             {
                 List<StorageFile> fileList = new List<StorageFile>();
-                foreach(StorageFile file in LocalListView.SelectedItems)
+                foreach(FileItem fileItem in LocalListView.SelectedItems)
                 {
+                    StorageFile file = (StorageFile)fileItem;
                     fileList.Add(file);
                     request.Data.Properties.Title += file.DisplayName + "; ";
                 }
@@ -1167,7 +1194,7 @@ namespace doc_onlook
             Debug.WriteLine("DeleteBtn");
             if (LocalListView.SelectionMode == ListViewSelectionMode.Single)
             {
-                StorageFile file = (StorageFile)LocalListView.SelectedItem;
+                StorageFile file = (StorageFile)((FileItem)(LocalListView.SelectedItem));
                 try
                 {
                     await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
@@ -1187,8 +1214,9 @@ namespace doc_onlook
                 try
                 {
                     List<string> deleteFileNames = new List<string>();
-                    foreach (StorageFile file in LocalListView.SelectedItems)
+                    foreach (FileItem fileItem in LocalListView.SelectedItems)
                     {
+                        StorageFile file = (StorageFile)fileItem;
                         await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
                         workspace.DeleteFromList(file.DisplayName + file.FileType);
                     }
@@ -1208,7 +1236,7 @@ namespace doc_onlook
         {
             if(LocalListView.SelectionMode == ListViewSelectionMode.Single)
             {
-                StorageFile file = (StorageFile)LocalListView.SelectedItem;
+                StorageFile file = (StorageFile)((FileItem)(LocalListView.SelectedItem));
                 await Launcher.LaunchFileAsync(file, new LauncherOptions
                 {
                     DisplayApplicationPicker = true,
@@ -1226,7 +1254,8 @@ namespace doc_onlook
             {
                 try
                 {
-                    var file = (StorageFile)LocalListView.SelectedItem;
+                    FileItem fileItem = (FileItem)((FileItem)(LocalListView.SelectedItem));
+                    var file = (StorageFile)((FileItem)((FileItem)(LocalListView.SelectedItem)));
                     if (workspace.GetPivotItemCount() == 0)
                     {
                         workspace.AddToList(file);
@@ -1264,9 +1293,10 @@ namespace doc_onlook
                 var fileDisplayName = ((TextBlock)header.Children[0]).Text;
                 var fileType = ((TextBlock)header.Children[1]).Text;
                 string fileName = fileDisplayName + fileType;
-                foreach (StorageFile fileItem in LocalListView.Items)
+                foreach (FileItem fileItem in LocalListView.Items)
                 {
-                    if (fileItem.DisplayName + fileItem.FileType == fileName)
+                    StorageFile storageItem = (StorageFile)fileItem;
+                    if (storageItem.DisplayName + storageItem.FileType == fileName)
                     {
                         LocalListView.SelectedIndex = LocalListView.Items.IndexOf(fileItem);
                     }
