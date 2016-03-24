@@ -33,19 +33,22 @@ using Windows.ApplicationModel.Background;
 using Windows.Storage.FileProperties;
 using System.Collections.ObjectModel;
 using Windows.UI.Xaml.Controls.Primitives;
+using System.Linq;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
 namespace doc_onlook
 {
+
     
     public sealed partial class MainPage : Page
     {
 
+
         Workspace workspace;
         List<StorageFile> localFilesList;
         List<StorageFile> localFilesList_queried;
-        ObservableCollection<FileItem> fileItemList;
+        List<FileItem> fileItemList;
         List<string> _matchingNamesList;
         List<string> fileNameList;
         StreamSocketListener _listener;
@@ -111,7 +114,7 @@ namespace doc_onlook
         {
             localFilesList = new List<StorageFile>();
             localFilesList_queried = new List<StorageFile>();
-            fileItemList = new ObservableCollection<FileItem>();
+            fileItemList = new List<FileItem>();
 
             IDictionary<string, string> dict = new Dictionary<string, string>();
             dict.Add("name", "hello");
@@ -124,8 +127,6 @@ namespace doc_onlook
             InitializeIPInfo();
 
             RegisterBackgroundTask();
-
-            ApplicationData.Current.LocalSettings.Values["hello.html"] = "unread";
         }
 
         private bool RegisterBackgroundTask()
@@ -140,6 +141,7 @@ namespace doc_onlook
             return true;
         }
         
+
 
         public class FileItem
         {
@@ -163,11 +165,11 @@ namespace doc_onlook
             {
                 get; set;
             }
-            public string fileIcon
+            public ulong fileSizeBytes
             {
                 get; set;
             }
-            public string readStatus
+            public string fileIcon
             {
                 get; set;
             }
@@ -195,12 +197,12 @@ namespace doc_onlook
                         break;
                 }
                 SetSize();
-                SetReadStatus((string)ApplicationData.Current.LocalSettings.Values[fileDisplayName+fileType]);
             }
             private async void SetSize()
             {
                 BasicProperties properties = await file.GetBasicPropertiesAsync();
                 ulong size = properties.Size;
+                this.fileSizeBytes = size;
                 string suffix = "B";
                 if(size > 1024)
                 {
@@ -225,17 +227,6 @@ namespace doc_onlook
                     return null;
                 }
                 return f.file;
-            }
-            public void SetReadStatus(string fileReadStatus)
-            {
-                if(fileReadStatus == "unread")
-                {
-                    readStatus = "#d0007e";
-                }
-                else
-                {
-                    readStatus = "Transparent";
-                }
             }
         }
 
@@ -745,6 +736,22 @@ namespace doc_onlook
             }
             LocalListView.ItemsSource = fileItemList;
             LocalListView.SelectedIndex = nextSelectedIndex;
+
+        }
+
+        private void SetReadStatus(string fileName, ListViewItem lvItem)
+        {
+            if (lvItem != null)
+            {
+                if ((string)ApplicationData.Current.LocalSettings.Values[fileName] == "read")
+                {
+                    lvItem.ContentTemplate = (DataTemplate)Resources["ReadItemTemplate"];
+                }
+                else
+                {
+                    lvItem.ContentTemplate = (DataTemplate)Resources["UnreadItemTemplate"];
+                }
+            }
         }
 
         public async void UpdateLocalList_Thread()
@@ -944,8 +951,7 @@ namespace doc_onlook
                 default: NotifyUser_Thread("Can't write file");
                     break;
             }
-
-            
+            ApplicationData.Current.LocalSettings.Values[ContentData["name"] + ContentData["type"]] = "unread";
             
         }
 
@@ -1201,7 +1207,7 @@ namespace doc_onlook
         private void LoadAll_Tapped(object sender, TappedRoutedEventArgs e)
         {
             UpdateLocalList();
-            ((SymbolIcon)LoadAll.Content).Symbol = Symbol.Refresh;
+            ((Button)sender).Content = "";
         }
 
         private void ShareMailBtn_Click(object sender, RoutedEventArgs e)
@@ -1338,9 +1344,11 @@ namespace doc_onlook
                     var file = (StorageFile)((FileItem)(LocalListView.SelectedItem));
                     ApplicationData.Current.LocalSettings.Values[fileItem.fileDisplayName+fileItem.fileType] = "read";
 
-                    ListViewItem lvItem = (ListViewItem)LocalListView.ContainerFromItem(LocalListView.SelectedItem);
-
-                    ChangeReadStatus(lvItem);
+                    if (LocalListView.SelectedItem != null)
+                    {
+                        ListViewItem lvItem = (ListViewItem)LocalListView.ContainerFromItem(LocalListView.SelectedItem);
+                        SetReadStatus(fileItem.fileDisplayName + fileItem.fileType, lvItem);
+                    }
 
                     if (workspace.GetPivotItemCount() == 0)
                     {
@@ -1432,6 +1440,38 @@ namespace doc_onlook
         private void IPInfo_Tapped(object sender, TappedRoutedEventArgs e)
         {             
             NotifyUser(LocalListView.ItemContainerGenerator.ToString());
+        }
+
+        private void LocalListView_Loaded(object sender, RoutedEventArgs e)
+        {
+            foreach (FileItem fileItem in LocalListView.Items)
+            {
+                ListViewItem lvItem = (ListViewItem)LocalListView.ContainerFromItem(fileItem);
+                SetReadStatus(fileItem.fileDisplayName + fileItem.fileType, lvItem);
+            }
+        }
+        private void LocalListView_LayoutUpdated(object sender, object e)
+        {
+            foreach (FileItem fileItem in LocalListView.Items)
+            {
+                ListViewItem lvItem = (ListViewItem)LocalListView.ContainerFromItem(fileItem);
+                SetReadStatus(fileItem.fileDisplayName + fileItem.fileType, lvItem);
+            }
+        }
+
+        private void Sort_Click(object sender, RoutedEventArgs e)
+        {
+            
+            Sort_ComboBox.IsDropDownOpen = true;
+
+            //fileItemList.Sort((x, y) => ((int)x.fileSizeBytes- (int)y.fileSizeBytes));
+            //RefreshList();
+        }
+
+        private void RefreshList()
+        {
+            LocalListView.ItemsSource = null;
+            LocalListView.ItemsSource = fileItemList;
         }
     };
 
