@@ -30,6 +30,9 @@ using Windows.Graphics.Imaging;
 using Ideafixxxer.CsvParser;
 using System.IO;
 using Windows.ApplicationModel.Background;
+using Windows.Storage.FileProperties;
+using System.Collections.ObjectModel;
+using Windows.UI.Xaml.Controls.Primitives;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -42,7 +45,7 @@ namespace doc_onlook
         Workspace workspace;
         List<StorageFile> localFilesList;
         List<StorageFile> localFilesList_queried;
-        List<FileItem> fileItemList;
+        ObservableCollection<FileItem> fileItemList;
         List<string> _matchingNamesList;
         List<string> fileNameList;
         StreamSocketListener _listener;
@@ -108,7 +111,7 @@ namespace doc_onlook
         {
             localFilesList = new List<StorageFile>();
             localFilesList_queried = new List<StorageFile>();
-            fileItemList = new List<FileItem>();
+            fileItemList = new ObservableCollection<FileItem>();
 
             IDictionary<string, string> dict = new Dictionary<string, string>();
             dict.Add("name", "hello");
@@ -121,6 +124,8 @@ namespace doc_onlook
             InitializeIPInfo();
 
             RegisterBackgroundTask();
+
+            ApplicationData.Current.LocalSettings.Values["hello.html"] = "unread";
         }
 
         private bool RegisterBackgroundTask()
@@ -136,13 +141,13 @@ namespace doc_onlook
         }
         
 
-        class FileItem
+        public class FileItem
         {
             public StorageFile file
             {
                 get; set;
             }
-            public string dateCreated
+            public string fileDateCreated
             {
                 get; set;
             }
@@ -154,13 +159,60 @@ namespace doc_onlook
             {
                 get; set;
             }
+            public string fileSize
+            {
+                get; set;
+            }
+            public string fileIcon
+            {
+                get; set;
+            }
+            public string readStatus
+            {
+                get; set;
+            }
 
             public FileItem(StorageFile file)
             {
                 this.file = file;
-                dateCreated = file.DateCreated.LocalDateTime.ToString();
+                fileDateCreated = file.DateCreated.LocalDateTime.ToString();
                 fileDisplayName = file.DisplayName;
                 fileType = file.FileType;
+                switch (fileType)
+                {
+                    case ".html": fileIcon = "Globe";
+                        break;
+                    case ".pdf":
+                    case ".txt":
+                        fileIcon = "Document";
+                        break;
+                    case ".jpg":
+                    case ".png":
+                        fileIcon = "Pictures";
+                        break;
+                    case ".csv":
+                        fileIcon = "Calculator";
+                        break;
+                }
+                SetSize();
+                SetReadStatus((string)ApplicationData.Current.LocalSettings.Values[fileDisplayName+fileType]);
+            }
+            private async void SetSize()
+            {
+                BasicProperties properties = await file.GetBasicPropertiesAsync();
+                ulong size = properties.Size;
+                string suffix = "B";
+                if(size > 1024)
+                {
+                    size /= 1024;
+                    suffix = "KB";
+                }
+                if (size > 1024)
+                {
+                    size /= 1024;
+                    suffix = "MB";
+                }
+                fileSize = size.ToString() + " " + suffix;
             }
             public static implicit operator FileItem(StorageFile s)
             {
@@ -173,6 +225,17 @@ namespace doc_onlook
                     return null;
                 }
                 return f.file;
+            }
+            public void SetReadStatus(string fileReadStatus)
+            {
+                if(fileReadStatus == "unread")
+                {
+                    readStatus = "#d0007e";
+                }
+                else
+                {
+                    readStatus = "Transparent";
+                }
             }
         }
 
@@ -329,7 +392,6 @@ namespace doc_onlook
                 {
                     if (imageContainer.Children.Count < 2)
                     {
-                        Debug.WriteLine("Loading " + i.ToString());
                         imageContainer.Children.Add(CreateProgressRing());
                         PdfPage pdfPage = _pdfDocument.GetPage((uint)i);
                         var stream = new InMemoryRandomAccessStream();
@@ -416,6 +478,7 @@ namespace doc_onlook
                         stackPanel.Children.Add(webView);
                         return stackPanel.Children[0];
 
+                    case ".png":
                     case ".jpg":
                         stackPanel.Children.Clear();
                         ScrollViewer scrollView = new ScrollViewer();
@@ -573,6 +636,14 @@ namespace doc_onlook
                             stackPanel = (StackPanel)SetContentType(stackPanel, ".txt", 0);
                             LoadTxt((TextBlock)(((ScrollViewer)stackPanel.Children[0]).Content), file);
                             break;
+                        case ".png":
+                            Debug.WriteLine("SetPivotItemContent .png");
+                            Image image_png = (Image)SetContentType(stackPanel, ".png", 0);
+                            var stream = await file.OpenAsync(FileAccessMode.Read);
+                            var img_png = new BitmapImage();
+                            img_png.SetSource(stream);
+                            image_png.Source = img_png;
+                            break;
                         default:
                             NotifyUser("Error: File extension not found.");
                             break;
@@ -666,8 +737,6 @@ namespace doc_onlook
                 }
                 i++;
             }
-
-
             LocalListView.ItemsSource = null;
             fileItemList.Clear();
             foreach(StorageFile item in localFilesList)
@@ -676,7 +745,6 @@ namespace doc_onlook
             }
             LocalListView.ItemsSource = fileItemList;
             LocalListView.SelectedIndex = nextSelectedIndex;
-
         }
 
         public async void UpdateLocalList_Thread()
@@ -691,7 +759,7 @@ namespace doc_onlook
 
         public async Task<List<StorageFile>> GetLocalFiles()
         {
-            StorageFolder localFolder = ApplicationData.Current.LocalFolder;
+            StorageFolder localFolder = ApplicationData.Current.LocalCacheFolder;
             StorageFileQueryResult queryResult =  localFolder.CreateFileQuery();
             IReadOnlyList<StorageFile> fileList = await queryResult.GetFilesAsync();
             List<StorageFile> localList = new List<StorageFile>();
@@ -771,7 +839,7 @@ namespace doc_onlook
         {
             try
             {
-                StorageFile localFile = await ApplicationData.Current.LocalFolder.GetFileAsync(fileName);
+                StorageFile localFile = await ApplicationData.Current.LocalCacheFolder.GetFileAsync(fileName);
                 return localFile;
             }
             catch(Exception exc){
@@ -843,7 +911,7 @@ namespace doc_onlook
 
         public async void WriteFileToLocal(IDictionary<string,string> ContentData)
         {
-            StorageFolder localFolder = ApplicationData.Current.LocalFolder;
+            StorageFolder localFolder = ApplicationData.Current.LocalCacheFolder;
             
             StorageFile newFile = await localFolder.CreateFileAsync(ContentData["name"] + ContentData["type"], CreationCollisionOption.GenerateUniqueName);
 
@@ -860,6 +928,7 @@ namespace doc_onlook
                                     }
                               }
                             break;
+                case ".png":
                 case ".pdf":
                 case ".jpg":   using (IRandomAccessStream textStream = await newFile.OpenAsync(FileAccessMode.ReadWrite))
                                 {
@@ -882,7 +951,7 @@ namespace doc_onlook
 
         public async void WriteUniqueFileToLocal(IDictionary<string, string> ContentData)
         {
-            StorageFolder localFolder = ApplicationData.Current.LocalFolder;
+            StorageFolder localFolder = ApplicationData.Current.LocalCacheFolder;
 
             StorageFile newFile = await localFolder.CreateFileAsync(ContentData["name"] + ContentData["type"], CreationCollisionOption.ReplaceExisting);
 
@@ -1054,9 +1123,12 @@ namespace doc_onlook
 
         private async void WorkspacePivot_Drop(object sender, DragEventArgs e)
         {
-            var fileName = await e.DataView.GetTextAsync();
-            StorageFile file = await ApplicationData.Current.LocalFolder.GetFileAsync(fileName);
-            workspace.AddToList(file);
+            var items = await e.DataView.GetStorageItemsAsync();
+            foreach(StorageFile file in items)
+            {
+                Debug.WriteLine("e.DataView: " + file.DisplayName);
+                workspace.AddToList(file);
+            }
             WorkspacePivot.SelectedIndex = WorkspacePivot.Items.Count - 1;
             DragPanelStatus(false);
         }
@@ -1067,7 +1139,15 @@ namespace doc_onlook
         }
         private void ListView_DragStarting(object sender, DragItemsStartingEventArgs e)
         {
-            e.Data.SetText(((StorageFile)e.Items[0]).DisplayName+((StorageFile)e.Items[0]).FileType);
+            int itemCount = e.Items.Count;
+            e.Data.SetText(itemCount.ToString());               
+            List<StorageFile> fileList = new List<StorageFile>();
+            foreach (FileItem fileItem in e.Items)
+            {
+                fileList.Add((StorageFile)fileItem);
+            }
+            e.Data.SetStorageItems(fileList);
+
             e.Data.RequestedOperation = DataPackageOperation.Copy;
             DragPanelStatus(true);
         }
@@ -1249,13 +1329,19 @@ namespace doc_onlook
 
         private void LocalListView_SelectionChanged(object sender, SelectionChangedEventArgs args)
         {
-            Debug.WriteLine("SelectionChanged");
+            Debug.WriteLine("SelectionChanged "+LocalListView.SelectedIndex);
             if (LocalListView.ItemsSource!=null && LocalListView.SelectionMode!=ListViewSelectionMode.Multiple && LocalListView.SelectedIndex!=-1)
             {
                 try
                 {
-                    FileItem fileItem = (FileItem)((FileItem)(LocalListView.SelectedItem));
-                    var file = (StorageFile)((FileItem)((FileItem)(LocalListView.SelectedItem)));
+                    FileItem fileItem = ((FileItem)(LocalListView.SelectedItem));
+                    var file = (StorageFile)((FileItem)(LocalListView.SelectedItem));
+                    ApplicationData.Current.LocalSettings.Values[fileItem.fileDisplayName+fileItem.fileType] = "read";
+
+                    ListViewItem lvItem = (ListViewItem)LocalListView.ContainerFromItem(LocalListView.SelectedItem);
+
+                    ChangeReadStatus(lvItem);
+
                     if (workspace.GetPivotItemCount() == 0)
                     {
                         workspace.AddToList(file);
@@ -1271,6 +1357,11 @@ namespace doc_onlook
                     NotifyUser("Sorry, we couldn't open the file: " + e.Message + ", " + e.HelpLink);
                 }
             }
+        }
+
+        private void ChangeReadStatus(ListViewItem lvItem)
+        {
+            VisualStateManager.GoToState(lvItem, "Read", false);
         }
 
         public class PdfPageListItem
@@ -1338,6 +1429,11 @@ namespace doc_onlook
             collapseBtn.Label = "";
         }
 
-    }
+        private void IPInfo_Tapped(object sender, TappedRoutedEventArgs e)
+        {             
+            NotifyUser(LocalListView.ItemContainerGenerator.ToString());
+        }
+    };
+
     
 }
