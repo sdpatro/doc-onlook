@@ -85,28 +85,28 @@ namespace doc_onlook
                 string v4Name = null;
                 foreach (var entry in hostNamesList)
                 {
-                    if (entry.Type==Windows.Networking.HostNameType.DomainName && domainName==null)
+                    if (entry.Type == Windows.Networking.HostNameType.DomainName && domainName == null)
                     {
                         domainName = entry.CanonicalName;
                     }
-                    if(entry.Type == Windows.Networking.HostNameType.Ipv4 && v4Name == null)
+                    if (entry.Type == Windows.Networking.HostNameType.Ipv4 && v4Name == null)
                     {
                         v4Name = entry.CanonicalName;
                     }
                 }
-                if (domainName!=null && v4Name!=null)
+                if (domainName != null && v4Name != null)
                 {
-                    IPInfo.Text = domainName + " " + v4Name;
+                    IPInfo.Text = domainName + "  |  " + v4Name;
                     IP_info = IPInfo.Text;
                 }
                 else
                 {
-                    IPInfo.Text = "Couldn't initialize IP information";
+                    IPInfo.Text = "Couldn't retrieve IP information.";
                 }
             }
             else
             {
-                IPInfo.Text = "Couldn't initialize IP information";
+                IPInfo.Text = "Couldn't retrieve IP information";
             }
         }
 
@@ -742,8 +742,10 @@ namespace doc_onlook
             LocalListView.SelectedIndex = nextSelectedIndex;
 
             Filter_ComboBox.SelectedIndex = -1;
-            Sort_ComboBox.SelectedIndex = -1;
-
+            if(Sort_ComboBox.SelectedIndex != -1)
+            {
+                SortBy((string)((ComboBoxItem)Sort_ComboBox.SelectedItem).Content);
+            }
         }
 
         private void SetReadStatus(string fileName, ListViewItem lvItem)
@@ -957,9 +959,7 @@ namespace doc_onlook
 
                 default: NotifyUser_Thread("Can't write file");
                     break;
-            }
-            ApplicationData.Current.LocalSettings.Values[ContentData["name"] + ContentData["type"]] = "unread";
-            
+            } 
         }
 
         public async void WriteUniqueFileToLocal(IDictionary<string, string> ContentData)
@@ -977,6 +977,15 @@ namespace doc_onlook
                 }
             }
 
+        }
+
+        private async void UpdateFileProgressBar(double status)
+        {
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+            () =>
+            {
+                FileReceptionBar.Value = status;
+            });
         }
 
         private string BuildPostResponse(string responseType, string fileSize, string timeTaken)
@@ -1013,8 +1022,15 @@ namespace doc_onlook
             {
                 using (IInputStream inStream = args.Socket.InputStream)
                 {
+                    await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+                    () =>
+                    {
+                        ShowIpInfoBtn.IsChecked = true;
+                        ProgressBarExpandAnim.Begin();
+                    });
 
-                    UpdateFileReceptionStatus("Received a connection.");
+                    UpdateFileReceptionStatus("Connected by <b>"+args.Socket.Information.RemoteHostName+"</b>");
+                    
                     DataReader reader = new DataReader(inStream);
                     reader.InputStreamOptions = InputStreamOptions.Partial;
                     int contentLength = 0;
@@ -1049,6 +1065,7 @@ namespace doc_onlook
                             }
                             totalContent += content;
                             UpdateFileReceptionStatus("Receiving: " + (totalContent.Length * 100 / contentLength) + "%");
+                            UpdateFileProgressBar((totalContent.Length * 100 / contentLength));
                             if (totalContent.Length == contentLength)
                             {
 
@@ -1058,7 +1075,7 @@ namespace doc_onlook
                                 string param_timeTaken = "";
                                 if (ContentData["action"] == "FIND_DEVICE")
                                 {
-                                    UpdateFileReceptionStatus("Pinged by a sender.");
+                                    UpdateFileReceptionStatus("Pinged by "+args.Socket.Information.RemoteHostName);
                                 }
                                 else
                                 {
@@ -1067,9 +1084,16 @@ namespace doc_onlook
                                     param_timeTaken = diff.TotalSeconds.ToString();
                                     UpdateFileReceptionStatus("Writing to your storage...");
                                     WriteFileToLocal(ContentData);
-                                    UpdateFileReceptionStatus("Done!");
+                                    UpdateFileReceptionStatus(""+ContentData["name"] + ContentData["type"] + " received successfully.");
+                                    ApplicationData.Current.LocalSettings.Values[ContentData["name"] + ContentData["type"]] = "unread";
                                     UpdateLocalList_Thread();
                                 }
+
+                                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+                                () =>
+                                {
+                                    ProgressBarCollapseAnim.Begin();
+                                });
 
                                 IBuffer replyBuff = Encoding.ASCII.GetBytes(BuildPostResponse(ContentData["action"],param_fileSize,param_timeTaken)).AsBuffer();
                                 await outStream.WriteAsync(replyBuff);
@@ -1083,7 +1107,7 @@ namespace doc_onlook
             }
             catch(Exception e)
             {
-                NotifyUser_Thread(e.StackTrace);
+                NotifyUser_Thread(e.Message + ", " + e.Source + ", "+ e.StackTrace);
             }
         }
 
@@ -1105,7 +1129,7 @@ namespace doc_onlook
                     }
                 }
 
-                LocalListView.SelectionMode = ListViewSelectionMode.Single;
+                MultiSelectBtn.IsChecked = false;
                 LocalListView.SelectedIndex = _preSelectedIndex;
             }
         }
@@ -1194,7 +1218,6 @@ namespace doc_onlook
             }
             LocalListView.ItemsSource = null;
             LocalListView.ItemsSource = fileItemList_queried;
-            ((SymbolIcon)LoadAll.Content).Symbol = Symbol.Back;
         }
 
         private async void AutoSuggestBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
@@ -1282,6 +1305,8 @@ namespace doc_onlook
                 try
                 {
                     await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
+                    ApplicationData.Current.LocalSettings.Values[file.DisplayName + file.FileType] = "unread";
+                    Debug.WriteLine(file.DisplayName + file.FileType);
                     workspace.DeleteFromList(file.DisplayName + file.FileType);
                 }
                 catch (Exception e)
@@ -1301,6 +1326,7 @@ namespace doc_onlook
                     foreach (FileItem fileItem in LocalListView.SelectedItems)
                     {
                         StorageFile file = (StorageFile)fileItem;
+                        ApplicationData.Current.LocalSettings.Values[file.DisplayName + file.FileType] = "unread";
                         await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
                         workspace.DeleteFromList(file.DisplayName + file.FileType);
                     }
@@ -1311,7 +1337,7 @@ namespace doc_onlook
                     return;
                 }
                 NotifyUser(count + " file(s) deleted successfully.");
-                LocalListView.SelectionMode = ListViewSelectionMode.Single;
+                MultiSelectBtn.IsChecked = false;
                 UpdateLocalList();
             }
         }
@@ -1340,6 +1366,7 @@ namespace doc_onlook
                 {
                     FileItem fileItem = ((FileItem)(LocalListView.SelectedItem));
                     var file = (StorageFile)((FileItem)(LocalListView.SelectedItem));
+                    Debug.WriteLine(fileItem.fileDisplayName + fileItem.fileType);
                     ApplicationData.Current.LocalSettings.Values[fileItem.fileDisplayName+fileItem.fileType] = "read";
 
                     if (LocalListView.SelectedItem != null)
@@ -1401,20 +1428,6 @@ namespace doc_onlook
             }
         }
 
-        private void MultiSelect_Click(object sender, RoutedEventArgs e)
-        {
-            if (LocalListView.SelectionMode == ListViewSelectionMode.Single)
-            {
-                _preSelectedIndex = LocalListView.SelectedIndex;
-                LocalListView.SelectionMode = ListViewSelectionMode.Multiple;
-                LocalListView.SelectedIndex = _preSelectedIndex;
-            }
-            else
-            {
-                LocalListView.SelectionMode = ListViewSelectionMode.Single;
-                LocalListView.SelectedIndex = _preSelectedIndex;
-            }
-        }
 
         private void Collapse_Click(object sender, RoutedEventArgs e)
         {
@@ -1606,6 +1619,30 @@ namespace doc_onlook
                 currentFileItemList.Add(fileItem);
             }
             return currentFileItemList;
+        }
+        
+        private void ShowIpInfoBtn_Checked(object sender, RoutedEventArgs e)
+        {
+            BottomPanelExpandAnim.Begin();
+        }
+
+        private void ShowIpInfoBtn_Unchecked(object sender, RoutedEventArgs e)
+        {
+            FileReceptionIndicator.Text = "No activity.";
+            BottomPanelCollapseAnim.Begin();
+        }
+
+        private void MultiSelectBtn_Checked(object sender, RoutedEventArgs e)
+        {
+            _preSelectedIndex = LocalListView.SelectedIndex;
+            LocalListView.SelectionMode = ListViewSelectionMode.Multiple;
+            LocalListView.SelectedIndex = _preSelectedIndex;
+        }
+
+        private void MultiSelectBtn_Unchecked(object sender, RoutedEventArgs e)
+        {
+            LocalListView.SelectionMode = ListViewSelectionMode.Single;
+            LocalListView.SelectedIndex = _preSelectedIndex;
         }
     };
     
