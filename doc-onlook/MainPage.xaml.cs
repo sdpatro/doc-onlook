@@ -200,25 +200,6 @@ namespace doc_onlook
                         fileIcon = "Calculator";
                         break;
                 }
-                SetSize();
-            }
-            private async void SetSize()
-            {
-                BasicProperties properties = await file.GetBasicPropertiesAsync();
-                ulong size = properties.Size;
-                this.fileSizeBytes = size;
-                string suffix = "B";
-                if(size > 1024)
-                {
-                    size /= 1024;
-                    suffix = "KB";
-                }
-                if (size > 1024)
-                {
-                    size /= 1024;
-                    suffix = "MB";
-                }
-                fileSize = size.ToString() + " " + suffix;
             }
             public static implicit operator FileItem(StorageFile s)
             {
@@ -736,8 +717,27 @@ namespace doc_onlook
             fileItemList.Clear();
             foreach(StorageFile item in localFilesList)
             {
-                fileItemList.Add(new FileItem(item));
+                FileItem newFileItem = new FileItem(item);
+
+                BasicProperties properties = await item.GetBasicPropertiesAsync();
+                ulong size = properties.Size;
+                newFileItem.fileSizeBytes = size;
+                string suffix = "B";
+                if (size > 1024)
+                {
+                    size /= 1024;
+                    suffix = "KB";
+                }
+                if (size > 1024)
+                {
+                    size /= 1024;
+                    suffix = "MB";
+                }
+                newFileItem.fileSize = (size.ToString() + " " + suffix);
+                
+                fileItemList.Add(newFileItem);
             }
+            
             LocalListView.ItemsSource = fileItemList;
             LocalListView.SelectedIndex = nextSelectedIndex;
 
