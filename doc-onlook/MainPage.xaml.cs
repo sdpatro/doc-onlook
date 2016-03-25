@@ -125,7 +125,6 @@ namespace doc_onlook
             fileNameList = new List<string>();
             _matchingNamesList = new List<string>();
             InitializeIPInfo();
-
             RegisterBackgroundTask();
         }
 
@@ -173,11 +172,16 @@ namespace doc_onlook
             {
                 get; set;
             }
+            public DateTime fileDateCreated_DateTime
+            {
+                get; set;
+            }
 
             public FileItem(StorageFile file)
             {
                 this.file = file;
                 fileDateCreated = file.DateCreated.LocalDateTime.ToString();
+                fileDateCreated_DateTime = file.DateCreated.LocalDateTime;
                 fileDisplayName = file.DisplayName;
                 fileType = file.FileType;
                 switch (fileType)
@@ -737,6 +741,9 @@ namespace doc_onlook
             LocalListView.ItemsSource = fileItemList;
             LocalListView.SelectedIndex = nextSelectedIndex;
 
+            Filter_ComboBox.SelectedIndex = -1;
+            Sort_ComboBox.SelectedIndex = -1;
+
         }
 
         private void SetReadStatus(string fileName, ListViewItem lvItem)
@@ -1161,8 +1168,9 @@ namespace doc_onlook
         private void AutoSuggestBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
         {
             _matchingNamesList.Clear();
-            foreach(string name in fileNameList)
+            foreach(FileItem fileItem in fileItemList)
             {
+                string name = fileItem.fileDisplayName;
                 if ((name.ToLower()).Contains((SuggestBox.Text).ToLower()))
                 {
                     _matchingNamesList.Add(name);
@@ -1178,30 +1186,20 @@ namespace doc_onlook
         private void AutoSuggestBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
         {
             var submittedName = args.QueryText;
-            localFilesList_queried.Clear();
-            foreach(StorageFile file in localFilesList)
+            List<FileItem> fileItemList_queried = new List<FileItem>();
+            foreach(FileItem fileItem in fileItemList)
             {
-                if (file.DisplayName.Contains(submittedName))
-                    localFilesList_queried.Add(file);
+                if (fileItem.fileDisplayName.Contains(submittedName))
+                    fileItemList_queried.Add(fileItem);
             }
             LocalListView.ItemsSource = null;
-            LocalListView.ItemsSource = localFilesList_queried;
+            LocalListView.ItemsSource = fileItemList_queried;
             ((SymbolIcon)LoadAll.Content).Symbol = Symbol.Back;
         }
 
         private async void AutoSuggestBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
         {
-            var selectedName = args.SelectedItem.ToString();
-            foreach (StorageFile storageFileItem in localFilesList)
-            {
-                if (storageFileItem.DisplayName == selectedName)
-                {
-                    WorkspacePivot.Focus(FocusState.Pointer);
-                    StorageFile file = await GetLocalFile(selectedName+storageFileItem.FileType);
-                    workspace.ShowDoc(file);
-                    break;
-                }
-            }
+
         }
 
         private void LoadAll_Tapped(object sender, TappedRoutedEventArgs e)
@@ -1459,21 +1457,156 @@ namespace doc_onlook
             }
         }
 
-        private void Sort_Click(object sender, RoutedEventArgs e)
-        {
-            
-            Sort_ComboBox.IsDropDownOpen = true;
-
-            //fileItemList.Sort((x, y) => ((int)x.fileSizeBytes- (int)y.fileSizeBytes));
-            //RefreshList();
-        }
-
         private void RefreshList()
         {
             LocalListView.ItemsSource = null;
             LocalListView.ItemsSource = fileItemList;
         }
-    };
 
+        private void Filter_ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (Filter_ComboBox.SelectedIndex != -1)
+            {
+                string selectedContent = (string)((ComboBoxItem)(Filter_ComboBox.SelectedItem)).Content;
+                FilterListBy(selectedContent);
+            }
+        }
+
+        private void FilterListBy(string filter)
+        {
+            List<FileItem> fileItemList_filter = new List<FileItem>();
+            string filterExtension = "other";
+            switch (filter)
+            {
+                case "HTML": filterExtension = ".html";
+                    break;
+                case "PDF":
+                    filterExtension = ".pdf";
+                    break;
+                case "CSV":
+                    filterExtension = ".csv";
+                    break;
+                case "TXT":
+                    filterExtension = ".txt";
+                    break;
+                case "JPG":
+                    filterExtension = ".jpg";
+                    break;
+                case "PNG":
+                    filterExtension = ".png";
+                    break;
+            }
+            if (filterExtension != "other")
+            {
+                foreach(FileItem fileItem in fileItemList)
+                {
+                    if(fileItem.fileType == filterExtension)
+                    {
+                        fileItemList_filter.Add(fileItem);
+                    }
+                }
+            }
+            else if(filter == "Unread")
+            {
+                foreach (FileItem fileItem in fileItemList)
+                {
+                    if ((string)ApplicationData.Current.LocalSettings.Values[fileItem.fileDisplayName+fileItem.fileType] == "unread")
+                    {
+                        fileItemList_filter.Add(fileItem);
+                    }
+                }
+            }
+            else
+            {
+                UpdateLocalList();
+            }
+            if (Filter_ComboBox.SelectedIndex != -1)
+            {
+                LocalListView.ItemsSource = null;
+                LocalListView.ItemsSource = fileItemList_filter;
+                if (Sort_ComboBox.SelectedIndex != -1)
+                {
+                    string sortContent = (string)((ComboBoxItem)(Sort_ComboBox.SelectedItem)).Content;
+                    SortBy(sortContent);
+                }
+            }
+        }
+
+        private void Sort_ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if(Sort_ComboBox.SelectedIndex != -1)
+            {
+                string sortContent = (string)((ComboBoxItem)(Sort_ComboBox.SelectedItem)).Content;
+                SortBy(sortContent);
+            }
+        }
+
+        private void SortBy(string sortBy)
+        {
+            string order = "";
+            string criteria = "";
+
+            List<FileItem> currentFileItemList = GetCurrentList();
+
+            switch (sortBy)
+            {
+                case "Name Asc.": order = "ASC";
+                    criteria = "Name";
+                    break;
+                case "Name Desc.":
+                    order = "DESC";
+                    criteria = "Name";
+                    break;
+                case "Size Asc.":
+                    order = "ASC";
+                    criteria = "Size";
+                    break;
+                case "Size Desc.":
+                    order = "DESC";
+                    criteria = "Size";
+                    break;
+                case "Date Asc.":
+                    order = "ASC";
+                    criteria = "Date";
+                    break;
+                case "Date Desc.":
+                    order = "DESC";
+                    criteria = "Date";
+                    break;
+                case "None":
+                    
+                    break;
+            }
+            switch (criteria)
+            {
+                case "Name": 
+                        currentFileItemList.Sort((x, y) => string.Compare(x.fileDisplayName,y.fileDisplayName));
+                    break;
+                case "Size":
+                    currentFileItemList.Sort((x, y) => (int)x.fileSizeBytes - (int)y.fileSizeBytes);
+                    break;
+                case "Date":
+                    currentFileItemList.Sort((x, y) => DateTime.Compare(x.fileDateCreated_DateTime, y.fileDateCreated_DateTime));
+                    break;
+            }
+            if (order == "DESC")
+            {
+                currentFileItemList.Reverse();
+            }
+
+            LocalListView.ItemsSource = null;
+            LocalListView.ItemsSource = currentFileItemList;
+        }
+
+        private List<FileItem> GetCurrentList()
+        {
+            List<FileItem> currentFileItemList = new List<FileItem>();
+            foreach (FileItem fileItem in LocalListView.Items)
+            {
+                currentFileItemList.Add(fileItem);
+            }
+            return currentFileItemList;
+        }
+    };
     
 }
