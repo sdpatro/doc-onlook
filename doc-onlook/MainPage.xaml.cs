@@ -47,14 +47,12 @@ namespace doc_onlook
 
         Workspace workspace;
         List<StorageFile> localFilesList;
-        List<StorageFile> localFilesList_queried;
         List<FileItem> fileItemList;
         List<string> _matchingNamesList;
         List<string> fileNameList;
         StreamSocketListener _listener;
         string IP_info;
         int _preSelectedIndex;
-        StorageFile _preSelectedItem;
 
 
         public MainPage()
@@ -85,35 +83,34 @@ namespace doc_onlook
                 string v4Name = null;
                 foreach (var entry in hostNamesList)
                 {
-                    if (entry.Type==Windows.Networking.HostNameType.DomainName && domainName==null)
+                    if (entry.Type == Windows.Networking.HostNameType.DomainName && domainName == null)
                     {
                         domainName = entry.CanonicalName;
                     }
-                    if(entry.Type == Windows.Networking.HostNameType.Ipv4 && v4Name == null)
+                    if (entry.Type == Windows.Networking.HostNameType.Ipv4 && v4Name == null)
                     {
                         v4Name = entry.CanonicalName;
                     }
                 }
-                if (domainName!=null && v4Name!=null)
+                if (domainName != null && v4Name != null)
                 {
-                    IPInfo.Text = domainName + " " + v4Name;
+                    IPInfo.Text = domainName + "  |  " + v4Name;
                     IP_info = IPInfo.Text;
                 }
                 else
                 {
-                    IPInfo.Text = "Couldn't initialize IP information";
+                    IPInfo.Text = "Couldn't retrieve IP information.";
                 }
             }
             else
             {
-                IPInfo.Text = "Couldn't initialize IP information";
+                IPInfo.Text = "Couldn't retrieve IP information";
             }
         }
 
         private void InitializeData()
         {
             localFilesList = new List<StorageFile>();
-            localFilesList_queried = new List<StorageFile>();
             fileItemList = new List<FileItem>();
 
             IDictionary<string, string> dict = new Dictionary<string, string>();
@@ -125,22 +122,7 @@ namespace doc_onlook
             fileNameList = new List<string>();
             _matchingNamesList = new List<string>();
             InitializeIPInfo();
-            RegisterBackgroundTask();
         }
-
-        private bool RegisterBackgroundTask()
-        {
-            BackgroundTaskBuilder builder = new BackgroundTaskBuilder();
-            builder.Name = "Background listener";
-            builder.TaskEntryPoint = "BackgroundListener.SampleBackgroundTask";
-            // Run every 1 minute if the device is on AC power 
-            IBackgroundTrigger trigger = new MaintenanceTrigger(60, false);
-            builder.SetTrigger(trigger);
-            IBackgroundTaskRegistration task = builder.Register();
-            return true;
-        }
-        
-
 
         public class FileItem
         {
@@ -742,8 +724,10 @@ namespace doc_onlook
             LocalListView.SelectedIndex = nextSelectedIndex;
 
             Filter_ComboBox.SelectedIndex = -1;
-            Sort_ComboBox.SelectedIndex = -1;
-
+            if(Sort_ComboBox.SelectedIndex != -1)
+            {
+                SortBy((string)((ComboBoxItem)Sort_ComboBox.SelectedItem).Content);
+            }
         }
 
         private void SetReadStatus(string fileName, ListViewItem lvItem)
@@ -763,7 +747,7 @@ namespace doc_onlook
 
         public async void UpdateLocalList_Thread()
         {
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
             () =>
             {
                 UpdateLocalList();
@@ -818,7 +802,7 @@ namespace doc_onlook
             }
             else
             {
-                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
                 async () =>
                 {
                     try
@@ -878,7 +862,7 @@ namespace doc_onlook
 
         public async void NotifyUser_Thread(string Message)
         {
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
             () =>
             {
                 MessageDialog dialog = new MessageDialog(Message);
@@ -888,10 +872,10 @@ namespace doc_onlook
 
         public async void UpdateFileReceptionStatus(string status)
         {
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
             () =>
             {
-                FileReceptionIndicator.Text = status;
+                FileReception_Status.Text = status;
             });
         }
 
@@ -957,9 +941,7 @@ namespace doc_onlook
 
                 default: NotifyUser_Thread("Can't write file");
                     break;
-            }
-            ApplicationData.Current.LocalSettings.Values[ContentData["name"] + ContentData["type"]] = "unread";
-            
+            } 
         }
 
         public async void WriteUniqueFileToLocal(IDictionary<string, string> ContentData)
@@ -977,6 +959,19 @@ namespace doc_onlook
                 }
             }
 
+        }
+
+        private async void UpdateFileProgressBar(double status)
+        {
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
+            () =>
+            {
+                if (ProgressBarPanel.ActualHeight != 20)
+                {
+                    ProgressBarPanel.Height = 20;
+                }
+                FileReceptionBar.Value = status;
+            });
         }
 
         private string BuildPostResponse(string responseType, string fileSize, string timeTaken)
@@ -1006,15 +1001,28 @@ namespace doc_onlook
             return responseString;
         }
 
+        private async void OpenReceptionPanel()
+        {
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
+            () =>
+            {
+                ShowIpInfoBtn.IsChecked = true;
+                //ProgressBarExpandAnim.Begin();
+            });
+        }
+
 
         private async void OnConnection( StreamSocketListener sender, StreamSocketListenerConnectionReceivedEventArgs args)
         {
             try
             {
+                OpenReceptionPanel();
                 using (IInputStream inStream = args.Socket.InputStream)
                 {
+                    UpdateFileReception_FileName("");
+                    UpdateFileReceptionStatus("Connected by " + args.Socket.Information.RemoteHostName.CanonicalName);
+                    Update_ProgressPanel_RemoteHost(args.Socket.Information.RemoteHostName.CanonicalName);
 
-                    UpdateFileReceptionStatus("Received a connection.");
                     DataReader reader = new DataReader(inStream);
                     reader.InputStreamOptions = InputStreamOptions.Partial;
                     int contentLength = 0;
@@ -1027,7 +1035,14 @@ namespace doc_onlook
                     do
                     {
                         numReadBytes = await reader.LoadAsync(1 << 20);
-
+                        await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
+                        () =>
+                        {
+                            if (ProgressBarPanel.Height == 0)
+                            {
+                                ProgressBarExpandAnim.Begin();
+                            }
+                        });
                         if (numReadBytes > 0)
                         {
                             byte[] tmpBuf = new byte[numReadBytes];
@@ -1048,17 +1063,20 @@ namespace doc_onlook
                                 content = contents[0];
                             }
                             totalContent += content;
-                            UpdateFileReceptionStatus("Receiving: " + (totalContent.Length * 100 / contentLength) + "%");
+                            UpdateFileReceptionStatus("Receiving: " + ((ulong)totalContent.Length * 100 / (ulong)contentLength) + "%");
+                            UpdateFileProgressBar(((ulong)totalContent.Length * 100 / (ulong)contentLength));
                             if (totalContent.Length == contentLength)
                             {
 
                                 UpdateFileReceptionStatus("Processing the stuff received...");
+
                                 var ContentData = ParseContent(totalContent);
                                 string param_fileSize = "";
                                 string param_timeTaken = "";
                                 if (ContentData["action"] == "FIND_DEVICE")
                                 {
-                                    UpdateFileReceptionStatus("Pinged by a sender.");
+                                    UpdateFileReception_FileName(args.Socket.Information.RemoteHostName.CanonicalName);
+                                    UpdateFileReceptionStatus(" connected.");
                                 }
                                 else
                                 {
@@ -1067,24 +1085,48 @@ namespace doc_onlook
                                     param_timeTaken = diff.TotalSeconds.ToString();
                                     UpdateFileReceptionStatus("Writing to your storage...");
                                     WriteFileToLocal(ContentData);
-                                    UpdateFileReceptionStatus("Done!");
+                                    UpdateFileReception_FileName(ContentData["name"] + ContentData["type"]);
+                                    UpdateFileReceptionStatus(" received.");
+                                    ApplicationData.Current.LocalSettings.Values[ContentData["name"] + ContentData["type"]] = "unread";
                                     UpdateLocalList_Thread();
                                 }
-
                                 IBuffer replyBuff = Encoding.ASCII.GetBytes(BuildPostResponse(ContentData["action"],param_fileSize,param_timeTaken)).AsBuffer();
                                 await outStream.WriteAsync(replyBuff);
                                 reader.DetachStream();
                                 args.Socket.Dispose();
-                                break;
+                                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
+                                () =>
+                                {
+                                    ProgressBarCollapseAnim.Begin();
+                                });
+                                return;
                             }
                         }
-                    } while (true);
+                    } while (numReadBytes>0);
                 }
             }
             catch(Exception e)
             {
-                NotifyUser_Thread(e.StackTrace);
+                NotifyUser_Thread(e.Message + ", " + e.Source + ", "+ e.StackTrace);
             }
+        }
+
+        private async void UpdateFileReception_FileName(string v)
+        {
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
+            () =>
+            {
+                FileReception_Name.Text = v;
+            });
+        }
+
+        private async void Update_ProgressPanel_RemoteHost(string v)
+        {
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.High,
+            () =>
+            {
+                ProgressPanel_RemoteHost.Text = v;
+            });
         }
 
         private void NewTabBtn_Tapped_1(object sender, TappedRoutedEventArgs e)
@@ -1105,7 +1147,7 @@ namespace doc_onlook
                     }
                 }
 
-                LocalListView.SelectionMode = ListViewSelectionMode.Single;
+                MultiSelectBtn.IsChecked = false;
                 LocalListView.SelectedIndex = _preSelectedIndex;
             }
         }
@@ -1194,7 +1236,6 @@ namespace doc_onlook
             }
             LocalListView.ItemsSource = null;
             LocalListView.ItemsSource = fileItemList_queried;
-            ((SymbolIcon)LoadAll.Content).Symbol = Symbol.Back;
         }
 
         private async void AutoSuggestBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
@@ -1282,6 +1323,8 @@ namespace doc_onlook
                 try
                 {
                     await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
+                    ApplicationData.Current.LocalSettings.Values[file.DisplayName + file.FileType] = "unread";
+                    Debug.WriteLine(file.DisplayName + file.FileType);
                     workspace.DeleteFromList(file.DisplayName + file.FileType);
                 }
                 catch (Exception e)
@@ -1301,6 +1344,7 @@ namespace doc_onlook
                     foreach (FileItem fileItem in LocalListView.SelectedItems)
                     {
                         StorageFile file = (StorageFile)fileItem;
+                        ApplicationData.Current.LocalSettings.Values[file.DisplayName + file.FileType] = "unread";
                         await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
                         workspace.DeleteFromList(file.DisplayName + file.FileType);
                     }
@@ -1311,7 +1355,7 @@ namespace doc_onlook
                     return;
                 }
                 NotifyUser(count + " file(s) deleted successfully.");
-                LocalListView.SelectionMode = ListViewSelectionMode.Single;
+                MultiSelectBtn.IsChecked = false;
                 UpdateLocalList();
             }
         }
@@ -1340,6 +1384,7 @@ namespace doc_onlook
                 {
                     FileItem fileItem = ((FileItem)(LocalListView.SelectedItem));
                     var file = (StorageFile)((FileItem)(LocalListView.SelectedItem));
+                    Debug.WriteLine(fileItem.fileDisplayName + fileItem.fileType);
                     ApplicationData.Current.LocalSettings.Values[fileItem.fileDisplayName+fileItem.fileType] = "read";
 
                     if (LocalListView.SelectedItem != null)
@@ -1401,20 +1446,6 @@ namespace doc_onlook
             }
         }
 
-        private void MultiSelect_Click(object sender, RoutedEventArgs e)
-        {
-            if (LocalListView.SelectionMode == ListViewSelectionMode.Single)
-            {
-                _preSelectedIndex = LocalListView.SelectedIndex;
-                LocalListView.SelectionMode = ListViewSelectionMode.Multiple;
-                LocalListView.SelectedIndex = _preSelectedIndex;
-            }
-            else
-            {
-                LocalListView.SelectionMode = ListViewSelectionMode.Single;
-                LocalListView.SelectedIndex = _preSelectedIndex;
-            }
-        }
 
         private void Collapse_Click(object sender, RoutedEventArgs e)
         {
@@ -1606,6 +1637,31 @@ namespace doc_onlook
                 currentFileItemList.Add(fileItem);
             }
             return currentFileItemList;
+        }
+        
+        private void ShowIpInfoBtn_Checked(object sender, RoutedEventArgs e)
+        {
+            BottomPanelExpandAnim.Begin();
+        }
+
+        private void ShowIpInfoBtn_Unchecked(object sender, RoutedEventArgs e)
+        {
+            UpdateFileReception_FileName("");
+            UpdateFileReceptionStatus("No activity");
+            BottomPanelCollapseAnim.Begin();
+        }
+
+        private void MultiSelectBtn_Checked(object sender, RoutedEventArgs e)
+        {
+            _preSelectedIndex = LocalListView.SelectedIndex;
+            LocalListView.SelectionMode = ListViewSelectionMode.Multiple;
+            LocalListView.SelectedIndex = _preSelectedIndex;
+        }
+
+        private void MultiSelectBtn_Unchecked(object sender, RoutedEventArgs e)
+        {
+            LocalListView.SelectionMode = ListViewSelectionMode.Single;
+            LocalListView.SelectedIndex = _preSelectedIndex;
         }
     };
     
