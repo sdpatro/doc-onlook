@@ -24,14 +24,14 @@
             </DoubleAnimation>
         </Storyboard>
         <Storyboard x:Name="ProgressBarExpandAnim">
-            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="ProgressBarPanel" Storyboard.TargetProperty="Height" From="0" To="4" Duration="0:0:0.2">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="ProgressBarPanel" Storyboard.TargetProperty="Height" From="0" To="20" Duration="0:0:0.2">
                 <DoubleAnimation.EasingFunction>
                     <QuinticEase EasingMode="EaseOut"/>
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
         <Storyboard x:Name="ProgressBarCollapseAnim">
-            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="ProgressBarPanel" Storyboard.TargetProperty="Height" From="4" To="0" Duration="0:0:0.5">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="ProgressBarPanel" Storyboard.TargetProperty="Height" From="20" To="0" Duration="0:0:0.2">
                 <DoubleAnimation.EasingFunction>
                     <QuinticEase EasingMode="EaseOut"/>
                 </DoubleAnimation.EasingFunction>
@@ -1005,15 +1005,15 @@
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" RequestedTheme="Light">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="3*"/>
+            <ColumnDefinition Width="3.5*"/>
             <ColumnDefinition Width="7*"/>
         </Grid.ColumnDefinitions>
         <Grid x:Name="FileList" MaxWidth="450" Grid.Row="0" Grid.Column="0" Background="#FFF7F7F7">
             <Grid.RowDefinitions>
                 <RowDefinition Height="9*"/>
-                <RowDefinition Height="5*"/>
+                <RowDefinition Height="6*"/>
             </Grid.RowDefinitions>
-            <ListView x:Name="LocalListView" Margin="5,17,5,109" CanDragItems="True" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted" SelectionChanged="LocalListView_SelectionChanged" SelectionMode="Single" Visibility="Visible" ItemContainerStyle="{StaticResource FileListViewItemStyle}" Grid.RowSpan="2" ItemTemplate="{StaticResource UnreadItemTemplate}" Loaded="LocalListView_Loaded" LayoutUpdated="LocalListView_LayoutUpdated" />
+            <ListView x:Name="LocalListView" Margin="5,17,5,109" CanDragItems="True" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted" SelectionChanged="LocalListView_SelectionChanged" SelectionMode="Single" Visibility="Visible" ItemContainerStyle="{StaticResource FileListViewItemStyle}" Grid.RowSpan="2" ItemTemplate="{StaticResource ReadItemTemplate}" Loaded="LocalListView_Loaded" LayoutUpdated="LocalListView_LayoutUpdated"/>
             <StackPanel x:Name="FileReception" Grid.Row="1" Margin="0,2,0,0" Padding="0" VerticalAlignment="Bottom">
                 <StackPanel.Background>
                     <SolidColorBrush Color="{StaticResource PanelBackgroundDark}"/>
@@ -1027,12 +1027,12 @@
                         </AutoSuggestBox>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,5">
-                        <Button x:Name="LoadAll" Content="&#xe72c;" Tapped="LoadAll_Tapped" FontFamily="Segoe MDL2 Assets" Style="{StaticResource DarkButtonStyle}" FontSize="16">
+                        <Button x:Name="LoadAll" Content="&#xe72c;" Tapped="LoadAll_Tapped" FontFamily="Segoe MDL2 Assets" Style="{StaticResource DarkButtonStyle}" FontSize="18.667">
                             <Button.Foreground>
                                 <SolidColorBrush Color="{StaticResource PanelBackgroundLight}"/>
                             </Button.Foreground>
                         </Button>
-                        <ToggleButton x:Name="MultiSelectBtn" Content="&#xe133;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource ToggleButtonStyle}" FontSize="16" Checked="MultiSelectBtn_Checked" Unchecked="MultiSelectBtn_Unchecked"/>
+                        <ToggleButton x:Name="MultiSelectBtn" Content="&#xe133;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource ToggleButtonStyle}" FontSize="18.667" Checked="MultiSelectBtn_Checked" Unchecked="MultiSelectBtn_Unchecked"/>
                         <ComboBox x:Name="Sort_ComboBox" PlaceholderText="SORT BY" Style="{StaticResource ComboBoxStyle_Sort}" FontSize="12" FontFamily="Segoe UI Symbol" SelectionChanged="Sort_ComboBox_SelectionChanged" Width="95">
                             <ComboBox.Foreground>
                                 <SolidColorBrush Color="{StaticResource TextColorWhite}"/>
@@ -1059,7 +1059,7 @@
                         </ComboBox>
                         <ToggleButton x:Name="ShowIpInfoBtn" Content="&#xe952;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource ToggleButtonStyle}" FontSize="18.667" Checked="ShowIpInfoBtn_Checked" Unchecked="ShowIpInfoBtn_Unchecked"/>
                     </StackPanel>
-                    <StackPanel x:Name="BottomPanel" Height="120" Margin="1,20,0.2,0" VerticalAlignment="Center">
+                    <StackPanel x:Name="BottomPanel" Height="0" Margin="1,20,0.2,0" VerticalAlignment="Center">
                         <StackPanel.Background>
                             <SolidColorBrush Color="{StaticResource AppAccentColorMedium}"/>
                         </StackPanel.Background>
@@ -1073,14 +1073,22 @@
                                 <TextBlock.Foreground>
                                     <SolidColorBrush Color="{StaticResource PanelBackgroundLight}"/>
                                 </TextBlock.Foreground>
-					        <Run Text="No activity"/>
+					            <Run x:Name="FileReception_Name" Text="" FontWeight="Bold"/>
+                                <Run x:Name="FileReception_Status" Text="No activity"/>
                             </TextBlock>
-                            <StackPanel Name="ProgressBarPanel" Height="0">
+                            <StackPanel Name="ProgressBarPanel" Height="20" HorizontalAlignment="Center">
                                 <ProgressBar Name="FileReceptionBar" Value="0"  Width="250">
                                     <ProgressBar.Foreground>
                                         <SolidColorBrush Color="{StaticResource TextColorWhite}"/>
                                     </ProgressBar.Foreground>
                                 </ProgressBar>
+                                <TextBlock HorizontalAlignment="Center" FontSize="12" FontWeight="Bold">
+                                    <TextBlock.Foreground>
+                                        <SolidColorBrush Color="{StaticResource PanelBackgroundLight}"/>
+                                    </TextBlock.Foreground>
+                                    <Run>FROM</Run>
+                                    <Run x:Name="ProgressPanel_RemoteHost"></Run>
+                                </TextBlock>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Name="IpInfoPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,15,0,0" HorizontalAlignment="Center">
