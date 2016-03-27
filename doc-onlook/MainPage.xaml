@@ -512,36 +512,40 @@
                     <TextBlock Text="{Binding fileDisplayName}" FontWeight="SemiBold" Margin="7,0,0,0"/>
                     <TextBlock Text="{Binding fileType}" FontWeight="SemiLight"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="9.6,0,-9.4,0.4" Padding="8">
-                    <TextBlock Text="{Binding fileDateCreated}" FontWeight="SemiLight" FontSize="13.333"/>
-                    <TextBlock Text="{Binding fileSize}" FontWeight="SemiLight" Margin="10,0,0,0" FontSize="13.333"/>
+                <StackPanel Orientation="Horizontal" Padding="8">
+                    <TextBlock Text="{Binding fileSize}" FontWeight="Normal" FontSize="13.333" FontFamily="Segoe UI Semibold" Margin="10,0,0,0"/>
+                    <TextBlock Text="{Binding fileDateCreated}" FontWeight="SemiLight" FontSize="13.333" FontFamily="Segoe UI Semibold" Opacity="0.7" Margin="20,0,0,0"/>
                 </StackPanel>
             </StackPanel>
         </DataTemplate>
+        
         <DataTemplate x:Key="UnreadItemTemplate">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="9.6,0,-9.4,0" Padding="2,7,2,5">
-                    <SymbolIcon  RenderTransformOrigin="0.5,0.5" Symbol="Send" Margin="0,0,5,0" >
-                        <SymbolIcon.Foreground>
-                            <SolidColorBrush Color="{StaticResource AppAccentColorDark}"/>
-                        </SymbolIcon.Foreground>
-                        <SymbolIcon.RenderTransform>
-                            <CompositeTransform ScaleX="0.8" ScaleY="0.8"/>
-                        </SymbolIcon.RenderTransform>
-                    </SymbolIcon>
-                    <SymbolIcon Symbol="{Binding fileIcon}" RenderTransformOrigin="0.5,0.5" Foreground="Black" >
-                        <SymbolIcon.RenderTransform>
-                            <CompositeTransform ScaleX="0.8" ScaleY="0.8"/>
-                        </SymbolIcon.RenderTransform>
-                    </SymbolIcon>
-                    <TextBlock Text="{Binding fileDisplayName}" FontWeight="SemiBold" Margin="7,0,0,0"/>
-                    <TextBlock Text="{Binding fileType}" FontWeight="SemiLight"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="99*"></ColumnDefinition>
+                    <ColumnDefinition Width="1*"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <StackPanel Orientation="Horizontal" Margin="9.6,0,-9.4,0" Padding="2,7,2,5">
+                        <SymbolIcon Symbol="{Binding fileIcon}" RenderTransformOrigin="0.5,0.5" >
+                            <SymbolIcon.RenderTransform>
+                                <CompositeTransform ScaleX="0.8" ScaleY="0.8"/>
+                            </SymbolIcon.RenderTransform>
+                        </SymbolIcon>
+                        <TextBlock Text="{Binding fileDisplayName}" FontWeight="SemiBold" Margin="7,0,0,0"/>
+                        <TextBlock Text="{Binding fileType}" FontWeight="SemiLight"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Padding="8">
+                        <TextBlock Text="{Binding fileSize}" FontWeight="Normal" FontSize="13.333" FontFamily="Segoe UI Semibold" Margin="10,0,0,0"/>
+                        <TextBlock Text="{Binding fileDateCreated}" FontWeight="SemiLight" FontSize="13.333" FontFamily="Segoe UI Semibold" Opacity="0.7" Margin="20,0,0,0"/>
+                    </StackPanel>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="9.6,0,-9.4,0.4" Padding="8">
-                    <TextBlock Text="{Binding fileDateCreated}" FontWeight="SemiLight" FontSize="13.333" Margin="5,0,0,0"/>
-                    <TextBlock Text="{Binding fileSize}" FontWeight="SemiLight" Margin="10,0,0,0" FontSize="13.333"/>
+                <StackPanel Grid.Column="1">
+                    <StackPanel.Background>
+                        <SolidColorBrush Color="{StaticResource AppAccentColorLight}"/>
+                    </StackPanel.Background>
                 </StackPanel>
-            </StackPanel>
+            </Grid>
         </DataTemplate>
         <Style x:Key="DarkButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -1005,7 +1009,7 @@
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" RequestedTheme="Light">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="3.5*"/>
+            <ColumnDefinition x:Name="SideBar_ColDef" Width="3.5*"/>
             <ColumnDefinition Width="7*"/>
         </Grid.ColumnDefinitions>
         <Grid x:Name="FileList" MaxWidth="450" Grid.Row="0" Grid.Column="0" Background="#FFF7F7F7">
@@ -1057,7 +1061,12 @@
                             <ComboBoxItem FontFamily="Segoe UI" FontSize="12" Content="PNG"></ComboBoxItem>
                             <ComboBoxItem FontFamily="Segoe UI" FontSize="12" Content="Unread"></ComboBoxItem>
                         </ComboBox>
-                        <ToggleButton x:Name="ShowIpInfoBtn" Content="&#xe952;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource ToggleButtonStyle}" FontSize="18.667" Checked="ShowIpInfoBtn_Checked" Unchecked="ShowIpInfoBtn_Unchecked"/>
+                        <Rectangle Width="1" Margin="10,0,0,0" Opacity="0.5">
+                            <Rectangle.Fill>
+                                <SolidColorBrush Color="{StaticResource PanelBackgroundLight}"/>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                        <ToggleButton x:Name="ShowIpInfoBtn" Content="&#xe952;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource ToggleButtonStyle}" FontSize="18.667" Checked="ShowIpInfoBtn_Checked" Unchecked="ShowIpInfoBtn_Unchecked" Margin="0"/>
                     </StackPanel>
                     <StackPanel x:Name="BottomPanel" Height="0" Margin="1,20,0.2,0" VerticalAlignment="Center">
                         <StackPanel.Background>
@@ -1076,7 +1085,7 @@
 					            <Run x:Name="FileReception_Name" Text="" FontWeight="Bold"/>
                                 <Run x:Name="FileReception_Status" Text="No activity"/>
                             </TextBlock>
-                            <StackPanel Name="ProgressBarPanel" Height="20" HorizontalAlignment="Center">
+                            <StackPanel Name="ProgressBarPanel" Height="0" HorizontalAlignment="Center">
                                 <ProgressBar Name="FileReceptionBar" Value="0"  Width="250">
                                     <ProgressBar.Foreground>
                                         <SolidColorBrush Color="{StaticResource TextColorWhite}"/>
@@ -1108,9 +1117,7 @@
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
-
             </StackPanel>
-
         </Grid>
 
         <Grid Grid.Row="0" Grid.Column="1" Background="White">
@@ -1119,10 +1126,14 @@
 					<Run Text="Drag here for new tab"/>
                 </TextBlock>
             </StackPanel>
-            <Pivot x:Name="WorkspacePivot" SelectionChanged="WorkspacePivot_SelectionChanged"/>
+            <Pivot x:Name="WorkspacePivot" SelectionChanged="WorkspacePivot_SelectionChanged">
+                <Pivot.Background>
+                    <SolidColorBrush Color="{StaticResource PanelBackgroundLight}" Opacity="0.25"/>
+                </Pivot.Background>
+            </Pivot>
             <CommandBar x:Name="FileCommandBar" VerticalAlignment="Bottom" Opening="FileCommandBar_Opening" Closed="FileCommandBar_Closed">
                 <CommandBar.Content>
-                    <AppBarToggleButton x:Name="Collapse" Label="" VerticalAlignment="Top" Icon="DockLeft" Click="Collapse_Click"/>
+                    <AppBarToggleButton x:Name="Collapse" Label="" VerticalAlignment="Top" Icon="DockLeft" Click="Collapse_Click" Checked="Collapse_Checked" Unchecked="Collapse_Unchecked"/>
                 </CommandBar.Content>
                 <AppBarButton x:Name="OpenFileBtn" Label="Open file" VerticalAlignment="Top" Icon="OpenFile" Click="OpenFileBtn_Click"/>
                 <AppBarButton x:Name="ShareMailBtn" Label="Share" VerticalAlignment="Top"  Click="ShareMailBtn_Click">

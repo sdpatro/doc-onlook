@@ -34,6 +34,7 @@ using Windows.Storage.FileProperties;
 using System.Collections.ObjectModel;
 using Windows.UI.Xaml.Controls.Primitives;
 using System.Linq;
+using Windows.UI.Xaml.Documents;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -43,8 +44,6 @@ namespace doc_onlook
     
     public sealed partial class MainPage : Page
     {
-
-
         Workspace workspace;
         List<StorageFile> localFilesList;
         List<FileItem> fileItemList;
@@ -230,7 +229,7 @@ namespace doc_onlook
             {
                 PivotItem newItem = new PivotItem();
                 newItem.Height = workspacePivot.Height;
-                newItem.Header = CreatePivotItemHeader(fileName.Split('.')[0], fileName.Split('.')[1]);
+                newItem.Header = CreatePivotItemHeader(fileName.Split('.')[0], "."+fileName.Split('.')[1]);
 
                 newItem.Content = new StackPanel();
                 StackPanel stackPanel = (StackPanel)newItem.Content;
@@ -244,13 +243,23 @@ namespace doc_onlook
             {
                 StackPanel headerStack = new StackPanel();
                 headerStack.Orientation = Orientation.Horizontal;
-                TextBlock displayBlock = new TextBlock();
-                displayBlock.Text = fileDisplayName;
-                TextBlock typeBlock = new TextBlock();
-                typeBlock.Text = fileType;
-                typeBlock.FontSize = 12;
-                headerStack.Children.Add(displayBlock);
-                headerStack.Children.Add(typeBlock);
+                TextBlock fileNameBlock = new TextBlock();
+                fileNameBlock.Opacity = 0.6;
+
+                Run displayName = new Run();
+                displayName.FontSize = 21;
+                displayName.Text = fileDisplayName;
+                displayName.FontWeight = Windows.UI.Text.FontWeights.SemiBold;
+
+                Run type = new Run();
+                type.FontSize = 15;
+                type.Text = fileType;
+                type.FontWeight = Windows.UI.Text.FontWeights.SemiBold;
+
+                fileNameBlock.Inlines.Add(displayName);
+                fileNameBlock.Inlines.Add(type);
+
+                headerStack.Children.Add(fileNameBlock);
                 return headerStack;
             }
 
@@ -276,9 +285,7 @@ namespace doc_onlook
                 if(pivotItem != null)
                 {
                     StackPanel stackHeader = (StackPanel)pivotItem.Header;
-                    string fileDisplayName = ((TextBlock)stackHeader.Children[0]).Text;
-                    string fileType = ((TextBlock)stackHeader.Children[1]).Text;
-                    fileName = fileDisplayName + fileType;
+                    fileName = ((TextBlock)(stackHeader.Children[0])).Text;
                 }
                 return fileName;
             }
@@ -649,9 +656,8 @@ namespace doc_onlook
             {
                 Debug.WriteLine("GetCurrentDoc");
                 StackPanel header = (StackPanel)(((PivotItem)(workspacePivot.SelectedItem)).Header);
-                string fileDisplayName = ((TextBlock)(header.Children[0])).Text;
-                string fileType = ((TextBlock)(header.Children[1])).Text;
-                return fileDisplayName + fileType;
+                string fileName = ((TextBlock)(header.Children[0])).Text;
+                return fileName;
             }
 
             public Workspace(Pivot workspacePivot)
@@ -1432,9 +1438,7 @@ namespace doc_onlook
             if (WorkspacePivot.Items.Count > 0)
             {
                 var header = (StackPanel)(((PivotItem)WorkspacePivot.SelectedItem).Header);
-                var fileDisplayName = ((TextBlock)header.Children[0]).Text;
-                var fileType = ((TextBlock)header.Children[1]).Text;
-                string fileName = fileDisplayName + fileType;
+                String fileName = ((TextBlock)header.Children[0]).Text;
                 foreach (FileItem fileItem in LocalListView.Items)
                 {
                     StorageFile storageItem = (StorageFile)fileItem;
@@ -1662,6 +1666,16 @@ namespace doc_onlook
         {
             LocalListView.SelectionMode = ListViewSelectionMode.Single;
             LocalListView.SelectedIndex = _preSelectedIndex;
+        }
+
+        private void Collapse_Checked(object sender, RoutedEventArgs e)
+        {
+            SideBar_ColDef.Width = new GridLength(0,GridUnitType.Star);
+        }
+
+        private void Collapse_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SideBar_ColDef.Width = new GridLength(3.5, GridUnitType.Star);
         }
     };
     
