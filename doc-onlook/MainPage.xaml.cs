@@ -29,12 +29,9 @@ using Windows.Foundation;
 using Windows.Graphics.Imaging;
 using Ideafixxxer.CsvParser;
 using System.IO;
-using Windows.ApplicationModel.Background;
 using Windows.Storage.FileProperties;
-using System.Collections.ObjectModel;
-using Windows.UI.Xaml.Controls.Primitives;
-using System.Linq;
 using Windows.UI.Xaml.Documents;
+using Windows.UI.Xaml.Media.Animation;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -117,6 +114,8 @@ namespace doc_onlook
             dict.Add("type", ".html");
             dict.Add("data", "<html><body>Hello doc-onlook</body></html>");
             WriteUniqueFileToLocal(dict);
+
+            PivotItemHeaderExit.Completed += PivotItemHeaderExit_Completed;
 
             fileNameList = new List<string>();
             _matchingNamesList = new List<string>();
@@ -206,7 +205,7 @@ namespace doc_onlook
             public void AddToList(StorageFile file)
             {
                 Debug.WriteLine("AddToList: "+file.DisplayName+file.FileType);
-                PivotItem item = CreateWorkspaceItem(file.DisplayName + file.FileType);
+                PivotItem item = CreatePivotItem(file.DisplayName + file.FileType);
                 workspacePivot.Items.Add(item);
 
                 SetPivotItemContent(workspacePivot.Items.Count-1, file);
@@ -224,8 +223,8 @@ namespace doc_onlook
                 }
                 return -1;
             }
-
-            private PivotItem CreateWorkspaceItem(string fileName)
+            
+            private PivotItem CreatePivotItem(string fileName)
             {
                 PivotItem newItem = new PivotItem();
                 newItem.Height = workspacePivot.Height;
@@ -235,6 +234,8 @@ namespace doc_onlook
                 StackPanel stackPanel = (StackPanel)newItem.Content;
                 stackPanel.Height = newItem.Height;
                 stackPanel.Children.Add(new Image());
+
+                newItem.RenderTransform = new CompositeTransform();
 
                 return newItem;
             }
@@ -252,15 +253,23 @@ namespace doc_onlook
                 displayName.FontWeight = Windows.UI.Text.FontWeights.SemiBold;
 
                 Run type = new Run();
-                type.FontSize = 15;
+                type.FontSize = 0.1;
+                type.Foreground = new SolidColorBrush(Windows.UI.ColorHelper.FromArgb(1, 231, 231, 231));
                 type.Text = fileType;
-                type.FontWeight = Windows.UI.Text.FontWeights.SemiBold;
+                type.FontWeight = Windows.UI.Text.FontWeights.ExtraLight;
 
                 fileNameBlock.Inlines.Add(displayName);
                 fileNameBlock.Inlines.Add(type);
 
                 headerStack.Children.Add(fileNameBlock);
+                headerStack.RenderTransform = new CompositeTransform();
+                headerStack.Children.Add(new Canvas());
                 return headerStack;
+            }
+
+            private string GetHeaderStackName(PivotItem pivotItem)
+            {
+                return ((StackPanel)pivotItem.Header).Name;
             }
 
             public void DeleteFromList(string s)
@@ -292,17 +301,18 @@ namespace doc_onlook
             
             public void RemoveCurrent()
             {
-
                 if (workspacePivot.Items.Count > 1)
                 {
-                    int prevSelectedIndex = workspacePivot.SelectedIndex;
-                    int newSelectedIndex = (prevSelectedIndex - 1);
-                    if(newSelectedIndex == -1)
+                    if(workspacePivot.SelectedIndex == 0)
                     {
-                        newSelectedIndex = workspacePivot.Items.Count - 2;
+                        workspacePivot.SelectedIndex = 1;
+                        workspacePivot.Items.RemoveAt(0);
                     }
-                    workspacePivot.Items.RemoveAt(prevSelectedIndex);
-                    workspacePivot.SelectedIndex = newSelectedIndex;
+                    else
+                    {
+                        workspacePivot.SelectedIndex = workspacePivot.SelectedIndex - 1;
+                        workspacePivot.Items.RemoveAt(workspacePivot.SelectedIndex + 1);
+                    }
                 }
             }
 
@@ -613,6 +623,7 @@ namespace doc_onlook
                             NotifyUser("Error: File extension not found.");
                             break;
                     }
+                    
                 }
                 catch (Exception e)
                 {
@@ -1140,6 +1151,8 @@ namespace doc_onlook
             if(LocalListView.SelectionMode == ListViewSelectionMode.Single)
             {
                 workspace.AddToList((StorageFile)((FileItem)(LocalListView.SelectedItem)));
+                WorkspacePivot.SelectedIndex = WorkspacePivot.Items.Count - 1;
+                NewItemTransition((PivotItem)WorkspacePivot.SelectedItem);
             }
             else
             {
@@ -1155,26 +1168,34 @@ namespace doc_onlook
 
                 MultiSelectBtn.IsChecked = false;
                 LocalListView.SelectedIndex = _preSelectedIndex;
+                ((Storyboard)Resources["WorkspacePivotEaseOut_Left"]).Begin();
             }
         }
 
         private void CloseTabBtn_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            workspace.RemoveCurrent();
+            if (WorkspacePivot.Items.Count > 1)
+            {
+                MultiSelectBtn.IsChecked = false;
+                CloseTabTransition((PivotItem)WorkspacePivot.SelectedItem);
+            }
         }
 
         private void DragPanelStatus(bool status)
         {
             if (status == true)
             {
-                DragPanel.Opacity = 0.7;
                 DragPanel.SetValue(Canvas.ZIndexProperty, 1);
+                ((Storyboard)Resources["DragPanel_Expand"]).Begin();
+                ((Storyboard)Resources["WorkspacePivot_DragContract"]).Begin();
             }
             else
             {
-                DragPanel.Opacity = 0;
                 DragPanel.SetValue(Canvas.ZIndexProperty, -1);
+                ((Storyboard)Resources["DragPanel_Vanish"]).Begin();
+                ((Storyboard)Resources["WorkspacePivot_DragExpand"]).Begin();
             }
+            
         }
 
         private void WorkspacePivot_DragOver(object sender, DragEventArgs e)
@@ -1398,7 +1419,6 @@ namespace doc_onlook
                         ListViewItem lvItem = (ListViewItem)LocalListView.ContainerFromItem(LocalListView.SelectedItem);
                         SetReadStatus(fileItem.fileDisplayName + fileItem.fileType, lvItem);
                     }
-
                     if (workspace.GetPivotItemCount() == 0)
                     {
                         workspace.AddToList(file);
@@ -1407,6 +1427,7 @@ namespace doc_onlook
                     {
                         Debug.WriteLine("GetCurrentDoc: " + workspace.GetCurrentDoc());
                         workspace.ShowDoc(file);
+                        NewItemTransition((PivotItem)WorkspacePivot.SelectedItem);
                     }
                 }
                 catch (Exception e)
@@ -1647,7 +1668,7 @@ namespace doc_onlook
         {
             BottomPanelExpandAnim.Begin();
         }
-
+       
         private void ShowIpInfoBtn_Unchecked(object sender, RoutedEventArgs e)
         {
             UpdateFileReception_FileName("");
@@ -1677,6 +1698,57 @@ namespace doc_onlook
         {
             SideBar_ColDef.Width = new GridLength(3.5, GridUnitType.Star);
         }
+
+        private void NewItemTransition(PivotItem item)
+        {
+            if (item!=null)
+            {
+                ClearAllStoryboards();
+                foreach (DoubleAnimation anim in PivotItemEnter.Children)
+                {
+                    Storyboard.SetTarget(anim, item);
+                }
+                foreach (DoubleAnimation anim in PivotItemHeaderEnter.Children)
+                {
+                    Storyboard.SetTarget(anim, (StackPanel)item.Header);
+                }
+                PivotItemEnter.Begin();
+                PivotItemHeaderEnter.Begin(); 
+            }
+        }
+        
+        private void CloseTabTransition(PivotItem item)
+        {
+            if (item != null)
+            {
+                ClearAllStoryboards();
+                foreach (DoubleAnimation anim in PivotItemExit.Children)
+                {
+                    Storyboard.SetTarget(anim, item);
+                }
+                foreach (DoubleAnimation anim in PivotItemHeaderExit.Children)
+                {
+                    Storyboard.SetTarget(anim, (StackPanel)item.Header);
+                }
+                
+                PivotItemExit.Begin();
+                PivotItemHeaderExit.Begin();
+            }
+        }
+
+        private void PivotItemHeaderExit_Completed(object sender, object e)
+        {
+            workspace.RemoveCurrent();
+        }
+
+        private void ClearAllStoryboards()
+        {
+            PivotItemEnter.Stop();
+            PivotItemExit.Stop();
+            PivotItemHeaderEnter.Stop();
+            PivotItemHeaderExit.Stop();
+        }
+
     };
     
 }

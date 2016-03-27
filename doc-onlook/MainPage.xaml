@@ -37,6 +37,149 @@
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
+        <Storyboard x:Name="PivotItemEnter">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)" From="50" To="0" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Name="PivotItemHeaderEnter">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)" From="15" To="0" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Name="PivotItemExit">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)" From="0" To="50" Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Name="PivotItemHeaderExit">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)" From="0" To="15" Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Name="WorkspacePivotEaseOut_Left">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="WorkspacePivot" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateX)" From="-50" To="0" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Name="WorkspacePivot_DragContract">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="WorkspacePivot" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleX)" From="1" To="0.9" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="WorkspacePivot" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" From="1" To="0.9" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="WorkspacePivot" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)" From="0" To="100" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="WorkspacePivot" Storyboard.TargetProperty="Opacity" From="1" To="0.7" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Name="WorkspacePivot_DragExpand">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="WorkspacePivot" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleX)" From="0.9" To="1" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="WorkspacePivot" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" From="0.9" To="1" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="WorkspacePivot" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)" From="100" To="0" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="WorkspacePivot" Storyboard.TargetProperty="Opacity" From="0.7" To="1" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Name="DragPanel_Expand">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="DragPanel" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleX)" From="0.9" To="1" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="DragPanel" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" From="0.9" To="1" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="DragPanel" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)" From="100" To="0" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="DragPanel" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Name="DragPanel_Vanish">
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="DragPanel" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleX)" From="1" To="0.9" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="DragPanel" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.ScaleY)" From="1" To="0.9" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="DragPanel" Storyboard.TargetProperty="(UIElement.RenderTransform).(CompositeTransform.TranslateY)" From="0" To="100" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation EnableDependentAnimation="True" Storyboard.TargetName="DragPanel" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.5">
+                <DoubleAnimation.EasingFunction>
+                    <QuinticEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
         <Style x:Key="FileListViewItemStyle" TargetType="ListViewItem">
             <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}"/>
             <Setter Property="FontSize" Value="{ThemeResource ControlContentThemeFontSize}"/>
@@ -518,7 +661,7 @@
                 </StackPanel>
             </StackPanel>
         </DataTemplate>
-        
+
         <DataTemplate x:Key="UnreadItemTemplate">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -1121,15 +1264,39 @@
         </Grid>
 
         <Grid Grid.Row="0" Grid.Column="1" Background="White">
-            <StackPanel x:Name="DragPanel" Canvas.ZIndex="-1" Background="#FFFF1E1E" Opacity="0"  AllowDrop="True" DragOver="WorkspacePivot_DragOver" Drop="WorkspacePivot_Drop">
-                <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,200,0,0">
-					<Run Text="Drag here for new tab"/>
-                </TextBlock>
+            <StackPanel x:Name="DragPanel" Canvas.ZIndex="-1" Background="Transparent" Opacity="0"  AllowDrop="True" DragOver="WorkspacePivot_DragOver" Drop="WorkspacePivot_Drop" RenderTransformOrigin="0.5,0.5">
+                <StackPanel.RenderTransform>
+                    <CompositeTransform/>
+                </StackPanel.RenderTransform>
+                <StackPanel Width="350" Margin="0,100,0,0" Height="120" VerticalAlignment="Center">
+                    <StackPanel.Background>
+                        <SolidColorBrush Color="{StaticResource AppAccentColorLight}"/>
+                    </StackPanel.Background>
+                    <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,20,0,0" RenderTransformOrigin="0.5,0.5">
+                        <TextBlock.Foreground>
+                            <SolidColorBrush Color="{StaticResource TextColorWhite}"/>
+                        </TextBlock.Foreground>
+                        <TextBlock.RenderTransform>
+                            <CompositeTransform Rotation="180"/>
+                        </TextBlock.RenderTransform>
+                		<Run Text="" FontFamily="Segoe MDL2 Assets" FontSize="32"/>
+                    </TextBlock>
+                    <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,20,0,0" FontFamily="Segoe UI Semibold" FontWeight="Bold" FontSize="13.333">
+                		<Run Text="DRAG HERE FOR NEW TAB">
+                			<Run.Foreground>
+                				<SolidColorBrush Color="{StaticResource PanelBackgroundExtraLight}"/>
+                			</Run.Foreground>
+                		</Run>
+                    </TextBlock>
+                </StackPanel>
             </StackPanel>
             <Pivot x:Name="WorkspacePivot" SelectionChanged="WorkspacePivot_SelectionChanged">
                 <Pivot.Background>
-                    <SolidColorBrush Color="{StaticResource PanelBackgroundLight}" Opacity="0.25"/>
+                    <SolidColorBrush Color="{StaticResource PanelBackgroundExtraLight}" Opacity="0.25"/>
                 </Pivot.Background>
+                <Pivot.RenderTransform>
+                    <CompositeTransform />
+                </Pivot.RenderTransform>
             </Pivot>
             <CommandBar x:Name="FileCommandBar" VerticalAlignment="Bottom" Opening="FileCommandBar_Opening" Closed="FileCommandBar_Closed">
                 <CommandBar.Content>
