@@ -7,14 +7,14 @@
     RequestedTheme="Light">
     <Application.Resources>
         <ResourceDictionary>
-            <Color x:Key="AppAccentColorDark">#006378</Color>
-            <Color x:Key="AppAccentColorMedium">#00748d</Color>
-            <Color x:Key="AppAccentColorLight">#008fae</Color>
+            <Color x:Key="AppAccentColorDark">#006378</Color> <!-- RGB(0,99,120) -->
+            <Color x:Key="AppAccentColorMedium">#00819c</Color> <!-- RGB(0,129,156) -->
+            <Color x:Key="AppAccentColorLight">#008fae</Color> <!-- RGB(0,143,174) -->
             <Color x:Key="TextColorDark">#5a5a5a</Color>
             <Color x:Key="TextColorLight">#838383</Color>
             <Color x:Key="TextColorWhite">#FFFFFF</Color>
             <Color x:Key="PanelBackgroundLight">#C7C7C7</Color>
-            <Color x:Key="PanelBackgroundExtraLight">#e7e7e7</Color>
+            <Color x:Key="PanelBackgroundExtraLight">#f7f7f7</Color>
             <Color x:Key="PanelBackgroundDark">#555555</Color>
         </ResourceDictionary>
     </Application.Resources>

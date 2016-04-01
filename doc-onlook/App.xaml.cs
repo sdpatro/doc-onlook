@@ -10,6 +10,8 @@ using Windows.ApplicationModel.Background;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Media.SpeechRecognition;
+using Windows.UI;
+using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
@@ -29,39 +31,32 @@ namespace doc_onlook
         {
             this.InitializeComponent();
             this.Suspending += OnSuspending;
-            
         }
 
-        public void CheckBackgroundTasks()
+        private void SetTitleColors()
         {
-            var taskRegistered = false;
-            var exampleTaskName = "ExampleBackgroundTask";
+            var view = ApplicationView.GetForCurrentView();
 
-            foreach (var task in BackgroundTaskRegistration.AllTasks)
-            {
-                if (task.Value.Name == exampleTaskName)
-                {
-                    taskRegistered = true;                    
-                    break;
-                }
-            }
-        }
+            view.TitleBar.BackgroundColor = Color.FromArgb(255, 0, 129, 156);
+            view.TitleBar.ForegroundColor = Colors.White;
 
-        public void RegisterBackgroundTask()
-        {
-            var builder = new BackgroundTaskBuilder();
+            view.TitleBar.ButtonBackgroundColor = Color.FromArgb(255, 0, 129, 156);
+            view.TitleBar.ButtonForegroundColor = Colors.White;
 
-            builder.Name = "ExampleBackgroundTask";
-            builder.TaskEntryPoint = "RuntimeComponent1.ExampleBackgroundTask";
-            builder.SetTrigger(new SystemTrigger(SystemTriggerType.InternetAvailable, false));
-            WebView webView = new WebView();
-            
-        }
+            view.TitleBar.ButtonHoverBackgroundColor = Color.FromArgb(255, 0, 143, 174);
+            view.TitleBar.ButtonHoverForegroundColor = Colors.White;
 
-        private async void AttachVCD()
-        {
-            var storageFile = await Windows.Storage.StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///DocOnlookCommands.xml"));
-            await Windows.ApplicationModel.VoiceCommands.VoiceCommandDefinitionManager.InstallCommandDefinitionsFromStorageFileAsync(storageFile);
+            view.TitleBar.ButtonPressedBackgroundColor = Color.FromArgb(255, 0, 99, 120);
+            view.TitleBar.ButtonPressedForegroundColor = Colors.White;
+
+            view.TitleBar.ButtonInactiveBackgroundColor = Colors.White;
+            view.TitleBar.ButtonInactiveForegroundColor = Colors.Gray;
+
+            view.TitleBar.InactiveBackgroundColor = Colors.White;
+            view.TitleBar.InactiveForegroundColor = Colors.Gray;
+
+            ApplicationViewTitleBar titleBar = view.TitleBar;
+            titleBar.
         }
 
         /// <summary>
@@ -71,8 +66,8 @@ namespace doc_onlook
         /// <param name="e">Details about the launch request and process.</param>
         protected override void OnLaunched(LaunchActivatedEventArgs e)
         {
-            AttachVCD();
 
+            SetTitleColors();
 #if DEBUG
             if (System.Diagnostics.Debugger.IsAttached)
             {
@@ -109,9 +104,6 @@ namespace doc_onlook
             }
             // Ensure the current window is active
             Window.Current.Activate();
-
-            RegisterBackgroundTask();
-            CheckBackgroundTasks();
         }
 
         /// <summary>

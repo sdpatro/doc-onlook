@@ -32,6 +32,8 @@ using System.IO;
 using Windows.Storage.FileProperties;
 using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Media.Animation;
+using Windows.UI.Xaml.Printing;
+using Windows.Graphics.Printing;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -49,6 +51,8 @@ namespace doc_onlook
         StreamSocketListener _listener;
         string IP_info;
         int _preSelectedIndex;
+        int collapseThresholdWidth;
+        bool userCollapse;
 
 
         public MainPage()
@@ -64,8 +68,7 @@ namespace doc_onlook
         {
             UpdateLocalList();
             workspace = new Workspace(WorkspacePivot);
-            WorkspacePivot.Focus(FocusState.Pointer);
-            
+            WorkspacePivot.Focus(FocusState.Pointer);   
         }
 
         private void InitializeIPInfo()
@@ -116,10 +119,36 @@ namespace doc_onlook
             WriteUniqueFileToLocal(dict);
 
             PivotItemHeaderExit.Completed += PivotItemHeaderExit_Completed;
+            SideBar_Collapse.Completed += SideBar_Collapse_Completed;
+            Window.Current.SizeChanged += Current_SizeChanged;
+
+            userCollapse = false;
+            collapseThresholdWidth = 825;
 
             fileNameList = new List<string>();
             _matchingNamesList = new List<string>();
             InitializeIPInfo();
+        }
+
+        private void Current_SizeChanged(object sender, WindowSizeChangedEventArgs e)
+        {
+            var windowHeight = Window.Current.Bounds.Height;
+
+            if (e.Size.Width < collapseThresholdWidth)
+            {
+                Collapse.IsChecked = true;
+            }
+            else
+            {
+                SetPrimaryButtonsVisibility(Visibility.Visible);
+                SetSecondaryButtonsVisibility(Visibility.Collapsed);
+                Collapse.IsChecked = userCollapse;
+            }
+
+            WorkspacePivot.Height = windowHeight;
+            PivotItem selectedPivotItem = (PivotItem)(WorkspacePivot.SelectedItem);
+            if(selectedPivotItem!=null)
+            ((Grid)(selectedPivotItem.Content)).Height = windowHeight - FileCommandBar.ActualHeight-50;
         }
 
         public class FileItem
@@ -144,7 +173,7 @@ namespace doc_onlook
             {
                 get; set;
             }
-            public ulong fileSizeBytes
+            public double fileSizeBytes
             {
                 get; set;
             }
@@ -202,10 +231,10 @@ namespace doc_onlook
             PdfDocument _pdfDocument;
             StackPanel _pdfStack;
 
-            public void AddToList(StorageFile file)
+            public void AddToList(StorageFile file, double commandBarHeight)
             {
                 Debug.WriteLine("AddToList: "+file.DisplayName+file.FileType);
-                PivotItem item = CreatePivotItem(file.DisplayName + file.FileType);
+                PivotItem item = CreatePivotItem(file.DisplayName + file.FileType, commandBarHeight);
                 workspacePivot.Items.Add(item);
 
                 SetPivotItemContent(workspacePivot.Items.Count-1, file);
@@ -224,22 +253,23 @@ namespace doc_onlook
                 return -1;
             }
             
-            private PivotItem CreatePivotItem(string fileName)
+            private PivotItem CreatePivotItem(string fileName, double commandBarHeight)
             {
                 PivotItem newItem = new PivotItem();
-                newItem.Height = workspacePivot.Height;
+                newItem.Height = Window.Current.Bounds.Height - commandBarHeight;
                 newItem.Header = CreatePivotItemHeader(fileName.Split('.')[0], "."+fileName.Split('.')[1]);
-
-                newItem.Content = new StackPanel();
-                StackPanel stackPanel = (StackPanel)newItem.Content;
-                stackPanel.Height = newItem.Height;
-                stackPanel.Children.Add(new Image());
+                
+                newItem.Content = new Grid();
+                Grid grid = (Grid)newItem.Content;
+                grid.Height = newItem.Height;
+                grid.Children.Add(new Image());
+                grid.VerticalAlignment = VerticalAlignment.Top;
 
                 newItem.RenderTransform = new CompositeTransform();
 
                 return newItem;
             }
-
+            
             private StackPanel CreatePivotItemHeader(string fileDisplayName, string fileType)
             {
                 StackPanel headerStack = new StackPanel();
@@ -335,11 +365,8 @@ namespace doc_onlook
                 await dialog.ShowAsync();
             }
 
-            private void SetScrollViewerProperties(ScrollViewer scrollView, StackPanel stackPanel, string type)
+            private void SetScrollViewerProperties(ScrollViewer scrollView, Grid grid, string type)
             {
-                scrollView.Height = stackPanel.Height;
-                scrollView.Width = stackPanel.Width;
-
                 scrollView.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
                 scrollView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 scrollView.ZoomMode = ZoomMode.Enabled;
@@ -347,39 +374,52 @@ namespace doc_onlook
                 switch(type)
                 {
                     case "PDF": scrollView.ViewChanged += PdfScrollView_ViewChanged;
-                        break;
+                                scrollView.SizeChanged += PdfScrollView_SizeChanged;
+                                break;
                 }
                 
+            }
+
+            private void PdfScrollView_SizeChanged(object sender, SizeChangedEventArgs e)
+            {
+                var scrollView = (ScrollViewer)sender;
+                var panelWidth = ((StackPanel)scrollView.Content).ActualWidth;
+                scrollView.ZoomToFactor((float)scrollView.ActualWidth / (float)panelWidth);
             }
 
             private ProgressRing CreateProgressRing()
             {
                 ProgressRing progressRing = new ProgressRing();
+                progressRing.Foreground = new SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 0, 143, 174));
                 progressRing.Height = 100;
                 progressRing.Width = 100;
                 progressRing.IsActive = true;
                 return progressRing;
             }
 
-            private async void LoadPdfImage(int i, StackPanel imageContainer, Image img)
+            private async void LoadPdfImage(int i, Grid imageContainer, Image img)
             {
                 try
                 {
-                    if (imageContainer.Children.Count < 2)
+                    if (imageContainer.Children.Count < 3)
                     {
-                        imageContainer.Children.Add(CreateProgressRing());
+                        ProgressRing progressRing = CreateProgressRing();
+                        imageContainer.Children.Add(progressRing);
                         PdfPage pdfPage = _pdfDocument.GetPage((uint)i);
                         var stream = new InMemoryRandomAccessStream();
                         PdfPageRenderOptions options = new PdfPageRenderOptions();
                         options.BitmapEncoderId = BitmapEncoder.JpegXREncoderId;
-                        options.DestinationHeight = (uint)(0.8 * pdfPage.Dimensions.ArtBox.Height);
-                        options.DestinationWidth = (uint)(0.8 * pdfPage.Dimensions.ArtBox.Width);
+                        options.DestinationHeight = (uint)(pdfPage.Dimensions.ArtBox.Height);
+                        options.DestinationWidth = (uint)(pdfPage.Dimensions.ArtBox.Width);
                         await pdfPage.RenderToStreamAsync(stream, options);
                         BitmapImage pdfImg = new BitmapImage();
                         pdfImg.SetSource(stream);
                         img.Source = pdfImg;
+                        
                         imageContainer.Height = pdfImg.PixelHeight;
                         imageContainer.Width = pdfImg.PixelWidth;
+
+                        progressRing.Visibility = Visibility.Collapsed;
                     }
                 }
                 catch (Exception e)
@@ -402,7 +442,7 @@ namespace doc_onlook
                     {
                         for (var i = 0; i < pdfStackPanel.Children.Count; i++)
                         {
-                            StackPanel imageContainer = (StackPanel)pdfStackPanel.Children[i];
+                            Grid imageContainer = (Grid)pdfStackPanel.Children[i];
                             var ttv2 = imageContainer.TransformToVisual(Window.Current.Content);
                             Point imageCoords = ttv2.TransformPoint(new Point(0, 0));
                             var img = ((Image)(imageContainer).Children[0]);
@@ -417,11 +457,11 @@ namespace doc_onlook
                                 LoadPdfImage(i, imageContainer, img);
                                 if (i<pdfStackPanel.Children.Count-1)
                                 {
-                                    LoadPdfImage(i + 1, (StackPanel)pdfStackPanel.Children[i + 1], ((Image)((StackPanel)pdfStackPanel.Children[i + 1]).Children[0]));
+                                    LoadPdfImage(i + 1, (Grid)pdfStackPanel.Children[i + 1], ((Image)((Grid)pdfStackPanel.Children[i + 1]).Children[0]));
                                 }
                                 if (i>0)
                                 {
-                                    LoadPdfImage(i - 1, (StackPanel)pdfStackPanel.Children[i - 1], ((Image)((StackPanel)pdfStackPanel.Children[i - 1]).Children[0]));
+                                    LoadPdfImage(i - 1, (Grid)pdfStackPanel.Children[i - 1], ((Image)((Grid)pdfStackPanel.Children[i - 1]).Children[0]));
                                 }
                             }
                         }
@@ -429,73 +469,104 @@ namespace doc_onlook
                 }
             }
 
-            StackPanel CreateImageContainer(double height, double width)
+            Grid CreateImageContainer(double height, double width, int currentPageNum, int totalPageCount)
             {
-                StackPanel imageContainer = new StackPanel();
+                Grid imageContainer = new Grid();
                 imageContainer.Height = height;
                 imageContainer.Width = width;
-                Border myBorder2 = new Border();
+
                 imageContainer.Background = new SolidColorBrush(Windows.UI.Colors.White);
-                imageContainer.Margin = new Thickness(1);
+                imageContainer.Margin = new Thickness(5);
+
                 imageContainer.Children.Add(new Image());
+                imageContainer.Children.Add(CreatePageNumberContainer(currentPageNum, totalPageCount));
+
                 return imageContainer;
             }
 
-            private UIElement SetContentType(StackPanel stackPanel, string type, uint count)
+            StackPanel CreatePageNumberContainer(int current, int total)
+            {
+                StackPanel pageNumContainer = new StackPanel();
+                pageNumContainer.Background = new SolidColorBrush(Windows.UI.Colors.DimGray);
+                pageNumContainer.Padding = new Thickness(4);
+
+                TextBlock pageNumBlock = new TextBlock();
+
+                Run currentNum = new Run();
+                currentNum.Text = current.ToString();
+                currentNum.FontSize = 20;
+
+                Run totalNum = new Run();
+                totalNum.Text = " / " + total.ToString();
+                totalNum.FontSize = 12;
+
+                pageNumBlock.Inlines.Add(currentNum);
+                pageNumBlock.Inlines.Add(totalNum);
+                pageNumBlock.Foreground = new SolidColorBrush(Windows.UI.Colors.White);
+                pageNumContainer.Children.Add(pageNumBlock);
+
+                pageNumContainer.VerticalAlignment = VerticalAlignment.Top;
+                pageNumContainer.HorizontalAlignment = HorizontalAlignment.Left;
+                Canvas.SetZIndex(pageNumContainer, 2);
+
+                return pageNumContainer;
+            }
+
+            private UIElement SetContentType(Grid grid, string type, uint count)
             {
                 switch (type)
                 {
                     case ".html":
-
-                        stackPanel.Children.Clear();
+                        grid.Children.Clear();
                         WebView webView = new WebView();
                         webView.DOMContentLoaded += DOMContentLoaded;
-                        stackPanel.Children.Add(webView);
-                        return stackPanel.Children[0];
+                        webView.VerticalAlignment = VerticalAlignment.Stretch;
+                        webView.HorizontalAlignment = HorizontalAlignment.Stretch;
+                        
+                        grid.Children.Add(webView);
+                        return grid.Children[0];
 
                     case ".png":
                     case ".jpg":
-                        stackPanel.Children.Clear();
+                        grid.Children.Clear();
                         ScrollViewer scrollView = new ScrollViewer();
-                        SetScrollViewerProperties(scrollView, stackPanel,"JPEG");
+                        SetScrollViewerProperties(scrollView, grid,"JPEG");
 
                         Image image = new Image();
                         image.SizeChanged += ScrollViewImage_Loaded;
                         image.Stretch = Stretch.Uniform;
 
                         scrollView.Content = image;                        
-                        stackPanel.Children.Add(scrollView);           
+                        grid.Children.Add(scrollView);           
                         return image;
 
                     case ".pdf":
-                        stackPanel.Children.Clear();
+                        grid.Children.Clear();
                         ScrollViewer pdfScrollView = new ScrollViewer();
-                        pdfScrollView.Width = stackPanel.Width;
-
-                        SetScrollViewerProperties(pdfScrollView, stackPanel,"PDF");
-                        stackPanel.Children.Add(pdfScrollView);
-                        StackPanel pdfStackPanel = new StackPanel();
-                        pdfScrollView.Content = pdfStackPanel;
-                        pdfStackPanel.Width = pdfScrollView.Width;
-                        return stackPanel;
+                        SetScrollViewerProperties(pdfScrollView, grid,"PDF");
+                        grid.Children.Add(pdfScrollView);
+                        StackPanel pdfStack = new StackPanel();
+                        pdfScrollView.Content = pdfStack;
+                        pdfStack.Width = pdfScrollView.Width;
+                        return grid;
 
                     case ".csv":
-                        stackPanel.Children.Clear();
+                        grid.Children.Clear();
                         ScrollViewer csvScrollView = new ScrollViewer();
-                        SetScrollViewerProperties(csvScrollView, stackPanel, "CSV");
-                        stackPanel.Children.Add(csvScrollView);
+                        SetScrollViewerProperties(csvScrollView, grid, "CSV");
+                        grid.Children.Add(csvScrollView);
                         ListView csvListView = new ListView();
                         csvScrollView.Content = csvListView;
-                        return stackPanel;
+                        return grid;
 
                     case ".txt":
-                        stackPanel.Children.Clear();
+                        grid.Children.Clear();
                         ScrollViewer txtScrollView = new ScrollViewer();
-                        SetScrollViewerProperties(txtScrollView, stackPanel, "TXT");
-                        stackPanel.Children.Add(txtScrollView);
+                        SetScrollViewerProperties(txtScrollView, grid, "TXT");
+                        grid.Children.Add(txtScrollView);
                         TextBlock txtBlock = new TextBlock();
                         txtScrollView.Content = txtBlock;
-                        return stackPanel;
+                        return grid;
 
                     default:
                         return null;
@@ -516,33 +587,13 @@ namespace doc_onlook
                 {
                     scrollView.ZoomToFactor((float)scrollView.ViewportWidth / (float)image.ActualWidth);
                 }
-
-                scrollView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50; 
-            }
-
-            private void PdfScrollViewImage_Loaded(object sender, RoutedEventArgs e)
-            {
-                Image image = (Image)sender;
-                PivotItem pivotItem = (PivotItem)workspacePivot.Items[workspacePivot.SelectedIndex];
-                ScrollViewer pdfScrollView = (ScrollViewer)(((StackPanel)pivotItem.Content).Children[0]);
-
-                if (image.ActualHeight > image.ActualWidth)
-                {
-                    pdfScrollView.ZoomToFactor((float)pdfScrollView.ActualHeight / (float)image.ActualHeight);
-                }
-                else
-                {
-                    pdfScrollView.ZoomToFactor((float)pdfScrollView.ViewportWidth / (float)image.ActualWidth);
-                }
-                NotifyUser(pdfScrollView.ActualHeight + "," + image.ActualHeight);
-                pdfScrollView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50;
             }
 
             private void DOMContentLoaded(WebView webView, WebViewDOMContentLoadedEventArgs args)
             {
                 try
                 {
-                    webView.Height = ((PivotItem)(workspacePivot.Items[workspacePivot.SelectedIndex])).ActualHeight - 50;
+                    webView.Height = ((StackPanel)(webView.Parent)).ActualHeight;
                 }
                 catch (Exception e)
                 {
@@ -556,9 +607,9 @@ namespace doc_onlook
                 _pdfStack = stackPanel;
                 for (uint i = 0; i < pdfDocument.PageCount; i++)
                 {
-                    stackPanel.Children.Add(CreateImageContainer(pdfDocument.GetPage(i).Dimensions.ArtBox.Height, pdfDocument.GetPage(i).Dimensions.ArtBox.Width));
+                    stackPanel.Children.Add(CreateImageContainer(pdfDocument.GetPage(i).Dimensions.ArtBox.Height, pdfDocument.GetPage(i).Dimensions.ArtBox.Width, (int)i+1, (int)pdfDocument.PageCount));
                 }
-                LoadPdfImage(0, (StackPanel)stackPanel.Children[0], (Image)((StackPanel)(stackPanel.Children[0])).Children[0]);
+                LoadPdfImage(0, (Grid)stackPanel.Children[0], (Image)((Grid)(stackPanel.Children[0])).Children[0]);
                 pdfScrollView.Loaded += PdfScrollView_Loaded;
             }
 
@@ -576,20 +627,21 @@ namespace doc_onlook
                     Debug.WriteLine("SetPivotItemContent");
                     PivotItem pivotItem = (PivotItem)workspacePivot.Items[index];
                     
-                    StackPanel stackPanel = (StackPanel)pivotItem.Content;
+                    Grid grid = (Grid)pivotItem.Content;
+                    grid.Children.Clear();
                     pivotItem.Header = CreatePivotItemHeader(file.DisplayName.Split('.')[0],file.FileType);
 
                     switch (file.FileType)
                     {
                         case ".html":
                             Debug.WriteLine("SetPivotItemContent .html");
-                            WebView webView = (WebView)SetContentType(stackPanel, ".html", 0);
+                            WebView webView = (WebView)SetContentType(grid, ".html", 0);
                             var buffer = await FileIO.ReadTextAsync(file);
                             webView.NavigateToString(buffer);
                             break;
                         case ".jpg":
                             Debug.WriteLine("SetPivotItemContent .jpg");
-                            Image image = (Image)SetContentType(stackPanel, ".jpg", 0);
+                            Image image = (Image)SetContentType(grid, ".jpg", 0);
                             var fileStream = await file.OpenAsync(FileAccessMode.Read);
                             var img = new BitmapImage();
                             img.SetSource(fileStream);
@@ -598,22 +650,22 @@ namespace doc_onlook
                         case ".pdf":
                             Debug.WriteLine("SetPivotItemContent .pdf");
                             PdfDocument pdfDocument = await PdfDocument.LoadFromFileAsync(file);
-                            stackPanel = (StackPanel)SetContentType(stackPanel, ".pdf", pdfDocument.PageCount);
-                            LoadPdf(pdfDocument, ((StackPanel)(((ScrollViewer)(stackPanel.Children[0])).Content)), (ScrollViewer)(stackPanel.Children[0]));
+                            grid = (Grid)SetContentType(grid, ".pdf", pdfDocument.PageCount);
+                            LoadPdf(pdfDocument, ((StackPanel)(((ScrollViewer)(grid.Children[0])).Content)), (ScrollViewer)(grid.Children[0]));
                             break;
                         case ".csv":
                             Debug.WriteLine("SetPivotItemContent .csv");                            
-                            stackPanel = (StackPanel)SetContentType(stackPanel, ".csv", 0);
-                            LoadCsv((ListView)(((ScrollViewer)(stackPanel.Children[0])).Content),file);
+                            grid = (Grid)SetContentType(grid, ".csv", 0);
+                            LoadCsv((ListView)(((ScrollViewer)(grid.Children[0])).Content),file);
                             break;
                         case ".txt":
                             Debug.WriteLine("SetPivotItemContent .txt");
-                            stackPanel = (StackPanel)SetContentType(stackPanel, ".txt", 0);
-                            LoadTxt((TextBlock)(((ScrollViewer)stackPanel.Children[0]).Content), file);
+                            grid = (Grid)SetContentType(grid, ".txt", 0);
+                            LoadTxt((TextBlock)(((ScrollViewer)grid.Children[0]).Content), file);
                             break;
                         case ".png":
                             Debug.WriteLine("SetPivotItemContent .png");
-                            Image image_png = (Image)SetContentType(stackPanel, ".png", 0);
+                            Image image_png = (Image)SetContentType(grid, ".png", 0);
                             var stream = await file.OpenAsync(FileAccessMode.Read);
                             var img_png = new BitmapImage();
                             img_png.SetSource(stream);
@@ -644,17 +696,31 @@ namespace doc_onlook
                 TextReader reader = new StringReader(csvText);
                 CsvParser csvParser = new CsvParser();
                 string[][] results = csvParser.Parse(reader);
-                List<string> resultsList = new List<string>();
+                
                 foreach(string[] result in results)
                 {
-                    string resultListItem = "";
-                    foreach(string resultColValue in result)
-                    {
-                        resultListItem += resultColValue + "    ";
-                    }
-                    resultsList.Add(resultListItem);
+                    csvListView.Items.Add(GenerateRow(result));
                 }
-                csvListView.ItemsSource = resultsList;               
+            }
+
+            private ListViewItem GenerateRow(string[] stringArray)
+            {
+                ListViewItem listViewItem = new ListViewItem();
+
+                StackPanel rowPanel = new StackPanel();
+                rowPanel.Orientation = Orientation.Horizontal;
+
+                foreach(string val in stringArray)
+                {
+                    TextBlock block = new TextBlock();
+                    block.Margin = new Thickness(5);
+                    block.Text = val;
+
+                    rowPanel.Children.Add(block);
+                }
+
+                listViewItem.Content = rowPanel;
+                return listViewItem;
             }
 
             public void ShowDoc(StorageFile file)
@@ -674,8 +740,8 @@ namespace doc_onlook
             public Workspace(Pivot workspacePivot)
             {
                 var bounds = Window.Current.Bounds;
-
                 this.workspacePivot = workspacePivot;
+                this.workspacePivot.VerticalAlignment = VerticalAlignment.Top;
                 this.workspacePivot.Height = bounds.Height;
                 workspaceList = new List<string>();
             }
@@ -719,7 +785,7 @@ namespace doc_onlook
                 FileItem newFileItem = new FileItem(item);
 
                 BasicProperties properties = await item.GetBasicPropertiesAsync();
-                ulong size = properties.Size;
+                double size = properties.Size;
                 newFileItem.fileSizeBytes = size;
                 string suffix = "B";
                 if (size > 1024)
@@ -732,6 +798,7 @@ namespace doc_onlook
                     size /= 1024;
                     suffix = "MB";
                 }
+                size = Math.Round(size, 1);
                 newFileItem.fileSize = (size.ToString() + " " + suffix);
                 
                 fileItemList.Add(newFileItem);
@@ -799,15 +866,10 @@ namespace doc_onlook
                     savePicker.SuggestedFileName = file.DisplayName;
 
                     StorageFile newFile = await savePicker.PickSaveFileAsync();
-                    if (file != null)
+                    if (newFile != null)
                     {
                         await file.CopyAndReplaceAsync(newFile);
-                        NotifyUser("File copied successfully");
-                    }
-                    else
-                    {
-                        MessageDialog dialog = new MessageDialog("Operation cancelled.");
-                        await dialog.ShowAsync();
+                        NotifyUser("File saved successfully.");
                     }
                 }
                 catch (Exception e)
@@ -834,7 +896,7 @@ namespace doc_onlook
                         foreach (FileItem file in LocalListView.SelectedItems)
                         {
                             StorageFile storageItem = (StorageFile)file;
-                            await storageItem.CopyAsync(folder);
+                            await storageItem.CopyAsync(folder,storageItem.DisplayName+storageItem.FileType,option:NameCollisionOption.GenerateUniqueName);
                             i++;
                         }
                         NotifyUser("All files saved successfully.");
@@ -1150,7 +1212,7 @@ namespace doc_onlook
         {
             if(LocalListView.SelectionMode == ListViewSelectionMode.Single)
             {
-                workspace.AddToList((StorageFile)((FileItem)(LocalListView.SelectedItem)));
+                workspace.AddToList((StorageFile)((FileItem)(LocalListView.SelectedItem)), FileCommandBar.ActualHeight);
                 WorkspacePivot.SelectedIndex = WorkspacePivot.Items.Count - 1;
                 NewItemTransition((PivotItem)WorkspacePivot.SelectedItem);
             }
@@ -1162,7 +1224,7 @@ namespace doc_onlook
                     string fileName = file.DisplayName + file.FileType;
                     if (workspace.InList(fileName) == -1)
                     {
-                        workspace.AddToList(file);
+                        workspace.AddToList(file, FileCommandBar.ActualHeight);
                     }
                 }
 
@@ -1209,7 +1271,7 @@ namespace doc_onlook
             foreach(StorageFile file in items)
             {
                 Debug.WriteLine("e.DataView: " + file.DisplayName);
-                workspace.AddToList(file);
+                workspace.AddToList(file, FileCommandBar.ActualHeight);
             }
             WorkspacePivot.SelectedIndex = WorkspacePivot.Items.Count - 1;
             DragPanelStatus(false);
@@ -1421,7 +1483,7 @@ namespace doc_onlook
                     }
                     if (workspace.GetPivotItemCount() == 0)
                     {
-                        workspace.AddToList(file);
+                        workspace.AddToList(file, FileCommandBar.ActualHeight);
                     }
                     else if (workspace.GetCurrentDoc() != (file.DisplayName + file.FileType))
                     {
@@ -1469,12 +1531,6 @@ namespace doc_onlook
                     }
                 }
             }
-        }
-
-
-        private void Collapse_Click(object sender, RoutedEventArgs e)
-        {
-
         }
 
         private void FileCommandBar_Opening(object sender, object e)
@@ -1621,11 +1677,11 @@ namespace doc_onlook
                     order = "DESC";
                     criteria = "Size";
                     break;
-                case "Date Asc.":
+                case "Oldest":
                     order = "ASC";
                     criteria = "Date";
                     break;
-                case "Date Desc.":
+                case "Latest":
                     order = "DESC";
                     criteria = "Date";
                     break;
@@ -1691,12 +1747,62 @@ namespace doc_onlook
 
         private void Collapse_Checked(object sender, RoutedEventArgs e)
         {
-            SideBar_ColDef.Width = new GridLength(0,GridUnitType.Star);
+            var windowWidth = Window.Current.CoreWindow.Bounds.Width;
+            SideBar_Collapse.Begin();
+
+            SetPrimaryButtonsVisibility(Visibility.Visible);
+            SetSecondaryButtonsVisibility(Visibility.Collapsed);
+        }
+        private void SideBar_Collapse_Completed(object sender, object e)
+        {
+            SideBar_ColDef.MinWidth = 0;
+            SideBar_ColDef.Width = new GridLength(0, GridUnitType.Star);
+            WorkspaceEaseOut_Right.Begin();
+        }
+
+        private void SetPrimaryButtonsVisibility(Visibility visibility)
+        {
+            foreach(AppBarButton btn in FileCommandBar.PrimaryCommands)
+            {
+                btn.Visibility = visibility;
+            }
+        }
+
+        private void SetSecondaryButtonsVisibility(Visibility visibility)
+        {
+            foreach (AppBarButton btn in FileCommandBar.SecondaryCommands)
+            {
+                btn.Visibility = visibility;
+            }
         }
 
         private void Collapse_Unchecked(object sender, RoutedEventArgs e)
         {
-            SideBar_ColDef.Width = new GridLength(3.5, GridUnitType.Star);
+            if (Window.Current.CoreWindow.Bounds.Width >= collapseThresholdWidth)
+            {
+                SideBar_ColDef.MinWidth = 325;
+                SideBar_ColDef.Width = new GridLength(3.5, GridUnitType.Star);
+            }
+            else
+            {
+                SideBar_ColDef.Width = new GridLength(325, GridUnitType.Pixel);
+                SetPrimaryButtonsVisibility(Visibility.Collapsed);
+                SetSecondaryButtonsVisibility(Visibility.Visible);
+            }
+            SideBar_Expand.Begin();
+            WorkspaceEaseOut_Right_Reverse.Begin();
+        }
+
+        private void Collapse_Click(object sender, RoutedEventArgs e)
+        {
+            if(Collapse.IsChecked == true)
+            {
+                userCollapse = true;
+            }
+            else
+            {
+                userCollapse = false;
+            }
         }
 
         private void NewItemTransition(PivotItem item)
@@ -1748,7 +1854,6 @@ namespace doc_onlook
             PivotItemHeaderEnter.Stop();
             PivotItemHeaderExit.Stop();
         }
-
     };
     
 }
