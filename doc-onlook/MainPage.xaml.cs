@@ -32,8 +32,6 @@ using System.IO;
 using Windows.Storage.FileProperties;
 using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Media.Animation;
-using Windows.UI.Xaml.Printing;
-using Windows.Graphics.Printing;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -53,7 +51,7 @@ namespace doc_onlook
         int _preSelectedIndex;
         int collapseThresholdWidth;
         bool userCollapse;
-
+        int fixSideBarWidthThreshold;
 
         public MainPage()
         {
@@ -124,6 +122,7 @@ namespace doc_onlook
 
             userCollapse = false;
             collapseThresholdWidth = 825;
+            fixSideBarWidthThreshold = 1150;
 
             fileNameList = new List<string>();
             _matchingNamesList = new List<string>();
@@ -140,15 +139,21 @@ namespace doc_onlook
             }
             else
             {
+
                 SetPrimaryButtonsVisibility(Visibility.Visible);
                 SetSecondaryButtonsVisibility(Visibility.Collapsed);
                 Collapse.IsChecked = userCollapse;
             }
 
             WorkspacePivot.Height = windowHeight;
+
             PivotItem selectedPivotItem = (PivotItem)(WorkspacePivot.SelectedItem);
-            if(selectedPivotItem!=null)
-            ((Grid)(selectedPivotItem.Content)).Height = windowHeight - FileCommandBar.ActualHeight-50;
+
+            if (selectedPivotItem != null)
+            {
+                selectedPivotItem.Height = windowHeight - FileCommandBar.ActualHeight - 50;
+                Debug.WriteLine("PivotItem size changed." + ((Grid)(selectedPivotItem.Content)).Height);
+            }
         }
 
         public class FileItem
@@ -256,14 +261,13 @@ namespace doc_onlook
             private PivotItem CreatePivotItem(string fileName, double commandBarHeight)
             {
                 PivotItem newItem = new PivotItem();
-                newItem.Height = Window.Current.Bounds.Height - commandBarHeight;
+                newItem.Height = Window.Current.Bounds.Height - commandBarHeight - 50;
                 newItem.Header = CreatePivotItemHeader(fileName.Split('.')[0], "."+fileName.Split('.')[1]);
                 
                 newItem.Content = new Grid();
                 Grid grid = (Grid)newItem.Content;
-                grid.Height = newItem.Height;
                 grid.Children.Add(new Image());
-                grid.VerticalAlignment = VerticalAlignment.Top;
+                grid.VerticalAlignment = VerticalAlignment.Stretch;
 
                 newItem.RenderTransform = new CompositeTransform();
 
@@ -514,12 +518,12 @@ namespace doc_onlook
 
             private UIElement SetContentType(Grid grid, string type, uint count)
             {
+
                 switch (type)
                 {
                     case ".html":
                         grid.Children.Clear();
                         WebView webView = new WebView();
-                        webView.DOMContentLoaded += DOMContentLoaded;
                         webView.VerticalAlignment = VerticalAlignment.Stretch;
                         webView.HorizontalAlignment = HorizontalAlignment.Stretch;
                         
@@ -577,7 +581,6 @@ namespace doc_onlook
             {
                 Image image = (Image)sender;
                 ScrollViewer scrollView = (ScrollViewer)image.Parent;
-                StackPanel stackPanel = (StackPanel)scrollView.Parent;
 
                 if (image.ActualHeight > image.ActualWidth)
                 {
@@ -586,18 +589,6 @@ namespace doc_onlook
                 else
                 {
                     scrollView.ZoomToFactor((float)scrollView.ViewportWidth / (float)image.ActualWidth);
-                }
-            }
-
-            private void DOMContentLoaded(WebView webView, WebViewDOMContentLoadedEventArgs args)
-            {
-                try
-                {
-                    webView.Height = ((StackPanel)(webView.Parent)).ActualHeight;
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteLine("DOMContentLoaded " + e.ToString());
                 }
             }
             
@@ -805,13 +796,14 @@ namespace doc_onlook
             }
             
             LocalListView.ItemsSource = fileItemList;
-            LocalListView.SelectedIndex = nextSelectedIndex;
 
             Filter_ComboBox.SelectedIndex = -1;
             if(Sort_ComboBox.SelectedIndex != -1)
             {
                 SortBy((string)((ComboBoxItem)Sort_ComboBox.SelectedItem).Content);
             }
+
+            LocalListView.SelectedIndex = 0;
         }
 
         private void SetReadStatus(string fileName, ListViewItem lvItem)
@@ -1014,13 +1006,19 @@ namespace doc_onlook
                                         var bytes = Convert.FromBase64String(ContentData["data"]);
                                         textWriter.WriteBytes(bytes);
                                         await textWriter.StoreAsync();
+                                        textWriter.DetachStream();
+                                        textWriter.Dispose();
                                     }
+                                    await textStream.FlushAsync();
+                                    textStream.Dispose();
                                 }
                             break;
 
                 default: NotifyUser_Thread("Can't write file");
                     break;
-            } 
+            }
+            ApplicationData.Current.LocalSettings.Values[newFile.DisplayName+newFile.FileType] = "unread";
+            UpdateLocalList_Thread();
         }
 
         public async void WriteUniqueFileToLocal(IDictionary<string, string> ContentData)
@@ -1142,6 +1140,7 @@ namespace doc_onlook
                                 content = contents[0];
                             }
                             totalContent += content;
+                            UpdateFileReception_FileName("");
                             UpdateFileReceptionStatus("Receiving: " + ((ulong)totalContent.Length * 100 / (ulong)contentLength) + "%");
                             UpdateFileProgressBar(((ulong)totalContent.Length * 100 / (ulong)contentLength));
                             if (totalContent.Length == contentLength)
@@ -1166,8 +1165,6 @@ namespace doc_onlook
                                     WriteFileToLocal(ContentData);
                                     UpdateFileReception_FileName(ContentData["name"] + ContentData["type"]);
                                     UpdateFileReceptionStatus(" received.");
-                                    ApplicationData.Current.LocalSettings.Values[ContentData["name"] + ContentData["type"]] = "unread";
-                                    UpdateLocalList_Thread();
                                 }
                                 IBuffer replyBuff = Encoding.ASCII.GetBytes(BuildPostResponse(ContentData["action"],param_fileSize,param_timeTaken)).AsBuffer();
                                 await outStream.WriteAsync(replyBuff);
@@ -1413,7 +1410,6 @@ namespace doc_onlook
                 {
                     await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
                     ApplicationData.Current.LocalSettings.Values[file.DisplayName + file.FileType] = "unread";
-                    Debug.WriteLine(file.DisplayName + file.FileType);
                     workspace.DeleteFromList(file.DisplayName + file.FileType);
                 }
                 catch (Exception e)
@@ -1473,7 +1469,6 @@ namespace doc_onlook
                 {
                     FileItem fileItem = ((FileItem)(LocalListView.SelectedItem));
                     var file = (StorageFile)((FileItem)(LocalListView.SelectedItem));
-                    Debug.WriteLine(fileItem.fileDisplayName + fileItem.fileType);
                     ApplicationData.Current.LocalSettings.Values[fileItem.fileDisplayName+fileItem.fileType] = "read";
 
                     if (LocalListView.SelectedItem != null)
@@ -1708,6 +1703,9 @@ namespace doc_onlook
 
             LocalListView.ItemsSource = null;
             LocalListView.ItemsSource = currentFileItemList;
+            
+            if(LocalListView.Items.Count > 0)
+            LocalListView.SelectedIndex = 0;
         }
 
         private List<FileItem> GetCurrentList()

@@ -37,11 +37,11 @@ namespace doc_onlook
         {
             var view = ApplicationView.GetForCurrentView();
 
-            view.TitleBar.BackgroundColor = Color.FromArgb(255, 0, 129, 156);
-            view.TitleBar.ForegroundColor = Colors.White;
+            view.TitleBar.BackgroundColor = Color.FromArgb(255, 247,247,247);
+            view.TitleBar.ForegroundColor = Colors.DimGray;
 
-            view.TitleBar.ButtonBackgroundColor = Color.FromArgb(255, 0, 129, 156);
-            view.TitleBar.ButtonForegroundColor = Colors.White;
+            view.TitleBar.ButtonBackgroundColor = Color.FromArgb(255, 247,247,247);
+            view.TitleBar.ButtonForegroundColor = Colors.DimGray;
 
             view.TitleBar.ButtonHoverBackgroundColor = Color.FromArgb(255, 0, 143, 174);
             view.TitleBar.ButtonHoverForegroundColor = Colors.White;
@@ -54,9 +54,6 @@ namespace doc_onlook
 
             view.TitleBar.InactiveBackgroundColor = Colors.White;
             view.TitleBar.InactiveForegroundColor = Colors.Gray;
-
-            ApplicationViewTitleBar titleBar = view.TitleBar;
-            titleBar.
         }
 
         /// <summary>

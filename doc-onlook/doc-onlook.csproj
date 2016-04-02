@@ -112,7 +112,6 @@
     <None Include="doc-onlook_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Assets\hello.html" />
     <Content Include="DocOnlookCommands.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <SubType>Designer</SubType>

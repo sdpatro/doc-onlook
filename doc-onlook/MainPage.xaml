@@ -1419,15 +1419,15 @@
             <SolidColorBrush Color="{StaticResource PanelBackgroundExtraLight}"/>
         </Grid.Background>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="SideBar_ColDef" Width="3.5*" MinWidth="325"/>
-            <ColumnDefinition Width="7*"/>
+            <ColumnDefinition x:Name="SideBar_ColDef" Width="3.5*" MinWidth="325" MaxWidth="450"/>
+            <ColumnDefinition x:Name="Workspace_ColDef" Width="7*"/>
         </Grid.ColumnDefinitions>
-        <Grid x:Name="FileList" MaxWidth="450" Grid.Row="0" Grid.Column="0">
+        <Grid x:Name="FileList" MaxWidth="450"  Grid.Row="0" Grid.Column="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="9*"/>
                 <RowDefinition Height="6*"/>
             </Grid.RowDefinitions>
-            <ListView x:Name="LocalListView" Margin="5,17,5,109" CanDragItems="True" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted" SelectionChanged="LocalListView_SelectionChanged" SelectionMode="Single" Visibility="Visible" ItemContainerStyle="{StaticResource FileListViewItemStyle}" Grid.RowSpan="2" ItemTemplate="{StaticResource ReadItemTemplate}" Loaded="LocalListView_Loaded" LayoutUpdated="LocalListView_LayoutUpdated">
+            <ListView x:Name="LocalListView" Margin="5,5,5,109" CanDragItems="True" DragItemsStarting="ListView_DragStarting" DragItemsCompleted="LocalListView_DragItemsCompleted" SelectionChanged="LocalListView_SelectionChanged" SelectionMode="Single" Visibility="Visible" ItemContainerStyle="{StaticResource FileListViewItemStyle}" Grid.RowSpan="2" ItemTemplate="{StaticResource ReadItemTemplate}" Loaded="LocalListView_Loaded" LayoutUpdated="LocalListView_LayoutUpdated">
                 <ListView.RenderTransform>
                     <CompositeTransform/>
                 </ListView.RenderTransform>

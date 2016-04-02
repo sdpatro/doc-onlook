@@ -14,7 +14,7 @@
             <Color x:Key="TextColorLight">#838383</Color>
             <Color x:Key="TextColorWhite">#FFFFFF</Color>
             <Color x:Key="PanelBackgroundLight">#C7C7C7</Color>
-            <Color x:Key="PanelBackgroundExtraLight">#f7f7f7</Color>
+            <Color x:Key="PanelBackgroundExtraLight">#f7f7f7</Color>  <!-- RGB(247,247,247) -->
             <Color x:Key="PanelBackgroundDark">#555555</Color>
         </ResourceDictionary>
     </Application.Resources>
