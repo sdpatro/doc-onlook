@@ -51,7 +51,6 @@ namespace doc_onlook
         int _preSelectedIndex;
         int collapseThresholdWidth;
         bool userCollapse;
-        int fixSideBarWidthThreshold;
 
         public MainPage()
         {
@@ -122,11 +121,28 @@ namespace doc_onlook
 
             userCollapse = false;
             collapseThresholdWidth = 825;
-            fixSideBarWidthThreshold = 1150;
 
             fileNameList = new List<string>();
             _matchingNamesList = new List<string>();
+            LoadSampleFiles();
             InitializeIPInfo();
+        }
+
+        private async void LoadSampleFiles()
+        {
+            StorageFolder localCacheFolder = ApplicationData.Current.LocalCacheFolder;
+            var folder = Windows.ApplicationModel.Package.Current.InstalledLocation;
+            folder = await folder.GetFolderAsync("SampleFiles");
+            StorageFile photo1 = await folder.GetFileAsync("Mountains.jpg");
+            StorageFile photo2 = await folder.GetFileAsync("Lake.jpg");
+            StorageFile csv1 = await folder.GetFileAsync("Books.csv");
+            StorageFile pdf1 = await folder.GetFileAsync("Sample PDF.pdf");
+            StorageFile txt1 = await folder.GetFileAsync("ArtOfWar.txt");
+            await photo1.CopyAsync(localCacheFolder,photo1.DisplayName,NameCollisionOption.ReplaceExisting);
+            await photo2.CopyAsync(localCacheFolder, photo2.DisplayName, NameCollisionOption.ReplaceExisting);
+            await csv1.CopyAsync(localCacheFolder, csv1.DisplayName, NameCollisionOption.ReplaceExisting);
+            await pdf1.CopyAsync(localCacheFolder, pdf1.DisplayName, NameCollisionOption.ReplaceExisting);
+            await txt1.CopyAsync(localCacheFolder, txt1.DisplayName, NameCollisionOption.ReplaceExisting);
         }
 
         private void Current_SizeChanged(object sender, WindowSizeChangedEventArgs e)
@@ -380,6 +396,11 @@ namespace doc_onlook
                     case "PDF": scrollView.ViewChanged += PdfScrollView_ViewChanged;
                                 scrollView.SizeChanged += PdfScrollView_SizeChanged;
                                 break;
+                    case "PNG":
+                    case "JPEG":scrollView.SizeChanged += ImageScrollView_SizeChanged;
+                                break;
+                    case "TXT": scrollView.SizeChanged += TxtScrollView_SizeChanged;
+                                break;
                 }
                 
             }
@@ -391,6 +412,19 @@ namespace doc_onlook
                 scrollView.ZoomToFactor((float)scrollView.ActualWidth / (float)panelWidth);
             }
 
+            private void TxtScrollView_SizeChanged(object sender, SizeChangedEventArgs e)
+            {
+                TextBlock block = (TextBlock)(((ScrollViewer)sender).Content);
+                block.Width = ((ScrollViewer)sender).ActualWidth;
+            }
+
+            private void ImageScrollView_SizeChanged(object sender, SizeChangedEventArgs e)
+            {
+                var scrollView = (ScrollViewer)sender;
+                var imageWidth = ((Image)scrollView.Content).ActualWidth;
+                scrollView.ZoomToFactor((float)scrollView.ActualWidth / (float)imageWidth);
+            }
+            
             private ProgressRing CreateProgressRing()
             {
                 ProgressRing progressRing = new ProgressRing();
@@ -560,6 +594,7 @@ namespace doc_onlook
                         SetScrollViewerProperties(csvScrollView, grid, "CSV");
                         grid.Children.Add(csvScrollView);
                         ListView csvListView = new ListView();
+                        csvListView.SelectionChanged += CsvListView_SelectionChanged;
                         csvScrollView.Content = csvListView;
                         return grid;
 
@@ -569,11 +604,20 @@ namespace doc_onlook
                         SetScrollViewerProperties(txtScrollView, grid, "TXT");
                         grid.Children.Add(txtScrollView);
                         TextBlock txtBlock = new TextBlock();
+                        txtBlock.TextWrapping = TextWrapping.WrapWholeWords;
                         txtScrollView.Content = txtBlock;
                         return grid;
 
                     default:
                         return null;
+                }
+            }
+
+            private void CsvListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+            {
+                if (sender != null)
+                {
+                    ((ListView)sender).SelectedIndex = -1;
                 }
             }
 
@@ -687,31 +731,72 @@ namespace doc_onlook
                 TextReader reader = new StringReader(csvText);
                 CsvParser csvParser = new CsvParser();
                 string[][] results = csvParser.Parse(reader);
-                
-                foreach(string[] result in results)
+
+                int columnCount = results[0].Length;
+                double[] maxWidth = new double[columnCount];
+                Array.Clear(maxWidth, 0, columnCount);
+
+                int i = 0;
+                foreach (string[] result in results)
                 {
-                    csvListView.Items.Add(GenerateRow(result));
+                    csvListView.Items.Add(GenerateRow(result,i));
+                    i++;
                 }
             }
 
-            private ListViewItem GenerateRow(string[] stringArray)
+            private ListViewItem GenerateRow(string[] stringArray, int index)
             {
                 ListViewItem listViewItem = new ListViewItem();
+
+                SolidColorBrush listItemBackground;
+                SolidColorBrush listItemForeground;
+                if (index != 0)
+                {
+                    listItemBackground = new SolidColorBrush(Windows.UI.Colors.White);
+                }
+                else
+                {
+                    listItemBackground = new SolidColorBrush(Windows.UI.Colors.LightGray);
+                }
+                listItemForeground = new SolidColorBrush(Windows.UI.Colors.DimGray);
+                listViewItem.Background = listItemBackground;    
+                listViewItem.Padding = new Thickness(10);
 
                 StackPanel rowPanel = new StackPanel();
                 rowPanel.Orientation = Orientation.Horizontal;
 
+                int i = 0;
                 foreach(string val in stringArray)
                 {
                     TextBlock block = new TextBlock();
-                    block.Margin = new Thickness(5);
                     block.Text = val;
-
+                    block.Width = 100;
+                    block.Tapped += Block_Tapped;
+                    block.FontWeight = Windows.UI.Text.FontWeights.SemiBold;
+                    block.Foreground = listItemForeground;
+                    block.Margin = new Thickness(10);
                     rowPanel.Children.Add(block);
+                    i++;
                 }
 
                 listViewItem.Content = rowPanel;
                 return listViewItem;
+            }
+
+            private void Block_Tapped(object sender, TappedRoutedEventArgs e)
+            {
+                TextBlock block = (TextBlock)sender;
+                if(block.Width == 100)
+                {
+                    block.Width = Double.NaN;
+                    block.Foreground = new SolidColorBrush(Windows.UI.ColorHelper.FromArgb(255, 0, 99, 120));
+                }
+                else
+                {
+                    block.Width = 100;
+                    block.Foreground = new SolidColorBrush(Windows.UI.Colors.DimGray);
+                }
+                
             }
 
             public void ShowDoc(StorageFile file)

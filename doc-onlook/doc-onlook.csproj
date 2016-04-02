@@ -89,7 +89,10 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- A reference to the entire .Net Framework and Windows SDK are automatically included -->
+    <Content Include="SampleFiles\ArtOfWar.txt" />
+    <Content Include="SampleFiles\Books.csv" />
     <None Include="project.json" />
+    <Content Include="SampleFiles\Sample PDF.pdf" />
     <None Include="Sender Sample\greany.pdf" />
     <None Include="Sender Sample\sample.csv" />
     <None Include="Sender Sample\sample.pdf" />
@@ -112,6 +115,8 @@
     <None Include="doc-onlook_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="SampleFiles\Lake.jpg" />
+    <Content Include="SampleFiles\Mountains.jpg" />
     <Content Include="DocOnlookCommands.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <SubType>Designer</SubType>
