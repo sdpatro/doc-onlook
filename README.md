@@ -9,6 +9,7 @@ April 3rd, 2016:
 
 <img src='http://i.imgur.com/Fwruz4r.png'><img>
 
+<img src="https://zippy.gfycat.com/TanDefiniteBovine.gif"><img>
 
 March 4th, 2016
 
